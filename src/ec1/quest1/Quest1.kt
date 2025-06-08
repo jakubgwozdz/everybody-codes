@@ -22,10 +22,10 @@ fun eni1(n: Long, exp: Long, mod: Long): Long {
     var score = 1L
     val remainders = mutableListOf<Long>()
     repeat(exp.toInt()) {
-        score = (score * n).mod(mod)
-        remainders.add(0, score)
+        score = score * n % mod
+        remainders += score
     }
-    return remainders.fold("") { acc, r -> acc + r }.toLong()
+    return remainders.reversed().joinToString("").toLong()
 }
 
 fun eni2(n: Long, exp: Long, mod: Long): Long {
@@ -34,36 +34,37 @@ fun eni2(n: Long, exp: Long, mod: Long): Long {
     var i = 0L
     var skipped = false
     while (i < exp) {
-        score = (score * n).mod(mod)
-        remainders.add(0, score)
+        score = score * n % mod
+        remainders += score
         i++
-        val lastIndexOfScore = remainders.lastIndexOf(score)
+        val lastIndexOfScore = remainders.size - 1 - remainders.indexOf(score)
         if (!skipped && lastIndexOfScore >= 5) {
             i += (((exp - i) / lastIndexOfScore / 5) - 1) * lastIndexOfScore * 5
             skipped = true
         }
     }
-    return remainders.take(5).fold("") { acc, r -> acc + r }.toLong()
-//        .debug { "eni5($n,$exp,$mod)=$it" }
+    return remainders.takeLast(5).reversed().joinToString("").toLong()
 }
 
 fun eni3(n: Long, exp: Long, mod: Long): Long {
     var score = 1L
     var partial = 0L
-    val remainders = ArrayList<Long>(10000)
+    val remainders = mutableListOf<Long>()
     var i = 0L
     var skipped = false
+    val seen = mutableSetOf<Long>()
     while (i < exp) {
-        score = (score * n).mod(mod)
-        remainders.add(0, score)
+        score = score * n % mod
+        remainders += score
         i++
-        val lastIndexOfScore = remainders.lastIndexOf(score)
-        if (!skipped && lastIndexOfScore > 0) {
-            val skips = ((exp - i) / lastIndexOfScore) - 1
+        if (!skipped && score in seen) {
+            val lastIndexOfScore = remainders.size - 1 - remainders.indexOf(score)
+            val skips = (exp - i) / lastIndexOfScore
             i += skips * lastIndexOfScore
-            partial = remainders.take(lastIndexOfScore).sum() * skips
+            partial = remainders.takeLast(lastIndexOfScore).sum() * skips
             skipped = true
         }
+        seen += score
     }
     return partial + remainders.sum()
 }
