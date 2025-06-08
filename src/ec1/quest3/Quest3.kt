@@ -20,17 +20,42 @@ val exampleB = """
     x=5 y=3
 """.trimIndent()
 
-private fun sequenceOfPositions(data: String): Sequence<List<Pair<Int, Int>>> =
-    generateSequence(parse(data)) { it.map { (x, y) -> if (y == 1) y to x else x + 1 to y - 1 } }
-
-fun part1(data: String): Any = sequenceOfPositions(data)
-    .drop(100).first()
-    .sumOf { (x, y) -> x + 100 * y }
+fun part1(data: String) = parse(data).sumOf { (x, y) ->
+    val loop = x + y - 1
+    val x100 = (x - 1 + 100) % loop + 1 // 1-based
+    val y100 = (loop + 1 - x100)
+    x100 + 100 * y100
+}
 
 fun part2(data: String): Any {
     val initial = parse(data)
-    return generateSequence(initial) { it.map { (x, y) -> if (y == 1) y to x else x + 1 to y - 1 } }
-        .indexOfFirst { it.all { (x, y) -> y == 1 } }
+    val remainders = initial.map { it.second }
+    val moduli = initial.map { it.first + it.second - 1L }
+    // crt
+    val product = moduli.reduce(Long::times)
+    return remainders.zip(moduli).sumOf { (rem, mod) ->
+        val partialProduct = product / mod
+        val inverse = partialProduct.modInv(mod)
+        rem * partialProduct * inverse
+    } % product - 1
+}
+
+fun Long.modInv(mod: Long): Long {
+    var a = this
+    var b = mod
+    var x = 0L
+    var y = 1L
+
+    while (a > 1) {
+        val q = a / b
+        var t = b
+        b = a % b
+        a = t
+        t = x
+        x = y - q * x
+        y = t
+    }
+    return if (y < 0) y + mod else y
 }
 
 fun part3(data: String) = part2(data)
@@ -47,5 +72,5 @@ fun main() {
     go("part2exA", 14) { part2(exampleA) }
     go("part2exB", 13659) { part2(exampleB) }
     go("part2", 1098490) { part2(provideInput(year, quest, 2)) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 95331589243) { part3(provideInput(year, quest, 3)) }
 }
