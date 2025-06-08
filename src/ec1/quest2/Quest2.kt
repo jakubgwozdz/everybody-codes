@@ -14,6 +14,8 @@ val exampleA = """
     SWAP 5
     ADD id=6 left=[20,G] right=[32,K]
     ADD id=7 left=[4,E] right=[21,N]
+    SWAP 2
+    SWAP 5
 """.trimIndent()
 
 data class Node(var rank: Int, var symbol: String, var left: Node? = null, var right: Node? = null)
@@ -27,20 +29,16 @@ fun Node.add(other: Node) {
     while (true) {
         when {
             n.rank > other.rank -> {
-                val next = n.left
-                if (next != null) n = next
-                else {
+                if (n.left == null) {
                     n.left = other
-                    return
-                }
+                    break
+                } else n = n.left!!
             }
             n.rank < other.rank -> {
-                val next = n.right
-                if (next != null) n = next
-                else {
+                if (n.right == null) {
                     n.right = other
-                    return
-                }
+                    break
+                } else n = n.right!!
             }
             else -> error("Rank ${other.rank} already in $this")
         }
@@ -51,14 +49,26 @@ fun Node.busiest() = generateSequence(listOf(this)) { prev ->
     prev.flatMap { listOf(it.left, it.right) }.filterNotNull().ifEmpty { null }
 }.maxBy { it.size }.joinToString("") { it.symbol }
 
-fun part1(data: String) = solve(data) { l, r -> error("SWAP not supported") }
+fun part1(data: String) = solve(data) { l, r -> }
 
 fun part2(data: String) = solve(data) { l, r ->
-    val tmp = l.rank to l.symbol
+    val tmp = l.copy()
     l.rank = r.rank
     l.symbol = r.symbol
-    r.rank = tmp.first
-    r.symbol = tmp.second
+    r.rank = tmp.rank
+    r.symbol = tmp.symbol
+}
+
+fun part3(data: String) = solve(data) { l, r ->
+    val tmp = l.copy()
+    l.rank = r.rank
+    l.symbol = r.symbol
+    l.left = r.left
+    l.right = r.right
+    r.rank = tmp.rank
+    r.symbol = tmp.symbol
+    r.left = tmp.left
+    r.right = tmp.right
 }
 
 private fun solve(data: String, swapOp: (Node, Node) -> Unit): String {
@@ -89,7 +99,7 @@ private fun solve(data: String, swapOp: (Node, Node) -> Unit): String {
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1", "QUACK!GSJXWNSM") { part1(provideInput(year, quest, 1)) }
-    go("part2", "MGFLNK") { part2(exampleA) }
     go("part2", "QUACK!BXXFYHTSRMFSHW") { part2(provideInput(year, quest, 2)) }
-//    go("part3", 564392275180979) { part3(provideInput(year, quest, 3)) }
+    go("part3", "DJCGL") { part3(exampleA) }
+    go("part3") { part3(provideInput(year, quest, 3)) }
 }
