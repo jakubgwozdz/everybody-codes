@@ -26,20 +26,34 @@ class Arrows() {
 
 fun part1(data: String): Any {
     val arrows = Arrows()
-    data.forEach { balloon->
+    data.forEach { balloon ->
         if (balloon != arrows.draw()) arrows.destroy()
     }
     return arrows.drawn
 }
 
-fun part2(data: String): Any = "2"
+fun part2and3(allBalloons: CharArray): Any {
+    val arrows = Arrows()
+    val remaining = allBalloons.toMutableList()
+    while (remaining.isNotEmpty()) {
+        val arrow = arrows.draw()
+        if (remaining.size % 2 == 0 && remaining.first() == arrow) {
+            remaining.removeAt(remaining.size / 2)
+        }
+        remaining.removeFirst()
+        arrows.destroy()
+    }
+    return arrows.drawn
+}
 
-fun part3(data: String): Any = "3"
+fun part2(data: String): Any = part2and3(buildString { repeat(100) { this.append(data) } }.toCharArray())
+
+fun part3(data: String): Any = part2and3(buildString { repeat(100000) { this.append(data) } }.toCharArray())
 
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("e1", 7) { part1("GRBGGGBBBRRRRRRRR") }
     go("part1", 134) { part1(provideInput(year, quest, 1)) }
-    go("part2", "") { part2(provideInput(year, quest, 2)) }
+    go("part2", 21305) { part2(provideInput(year, quest, 2)) }
     go("part3", "") { part3(provideInput(year, quest, 3)) }
 }
