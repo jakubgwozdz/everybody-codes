@@ -1,5 +1,8 @@
 package ec2.quest3
 
+import coords.pair.Pos
+import coords.pair.col
+import coords.pair.row
 import go
 import provideInput
 import yearAndQuestFromPackage
@@ -11,13 +14,15 @@ data class Die(
 ) {
     private var pulse: Long = seed
     private var selected: Int = 0
+    private var rollNumber: Int = 1
 
-    fun roll(rollNumber: Int): Int {
+    fun roll(): Int {
         val spin = rollNumber * pulse
         selected = ((selected + spin) % faces.size).toInt()
         pulse += spin
         pulse %= seed
         pulse += rollNumber + 1 + seed
+        rollNumber++
         return faces[selected]
     }
 }
@@ -29,30 +34,34 @@ private fun parseDice(data: String): List<Die> = data.lines().takeWhile { !it.is
     Die(id, faces, seed)
 }
 
+typealias Grid = List<List<Int>>
+
+private fun parseGrid(data: String): Grid =
+    data.lines().dropWhile { !it.isBlank() }.filterNot { it.isBlank() }.map { line ->
+        line.map { it.digitToInt() }
+    }
+
 fun part1(data: String): Any {
     val dice = parseDice(data)
     var rolls = 0
     var totalPoints = 0
     while (totalPoints < 10000) {
         rolls++
-        dice.forEach { totalPoints += it.roll(rolls) }
+        dice.forEach { totalPoints += it.roll() }
     }
     return rolls
 }
 
 fun part2(data: String): Any {
     val dice = parseDice(data).associateBy { it.id }
-    val track = data.lines().dropWhile { !it.isBlank() }.dropWhile { it.isBlank() }.first()
-        .map { it.digitToInt() }
+    val track = parseGrid(data).single()
     val positions = dice.keys.associateWith { 0 }.toMutableMap()
     val result = mutableListOf<Int>()
-    var rolls = 0
     while (positions.isNotEmpty()) {
-        rolls++
         val finished = mutableSetOf<Int>()
         positions.keys.forEach { id ->
             val die = dice[id]!!
-            val roll = die.roll(rolls)
+            val roll = die.roll()
             val pos = positions[id]!!
             if (roll == track[pos]) {
                 positions[id] = pos + 1
@@ -68,7 +77,58 @@ fun part2(data: String): Any {
     return result.joinToString(",")
 }
 
-fun part3(data: String): Any = TODO()
+
+operator fun Grid.get(pos: Pos) = this.getOrNull(pos.row)?.getOrNull(pos.col)
+operator fun Grid.contains(pos: Pos) = pos.row in this.indices && pos.col in this[pos.row].indices
+
+fun Grid.positions(): Sequence<Pair<Pos, Int>> = sequence {
+    forEachIndexed { row, line ->
+        line.forEachIndexed { col, value ->
+            yield(Pos(row, col) to value)
+        }
+    }
+}
+
+fun part3(data: String): Any {
+    val dice = parseDice(data)
+    val grid = parseGrid(data)
+    val connections = buildMap {
+        grid.positions().forEach { (pos, _) ->
+            val (row, col) = pos
+            this[pos] = listOf(
+                pos,
+                Pos(row - 1, col),
+                Pos(row + 1, col),
+                Pos(row, col - 1),
+                Pos(row, col + 1),
+            ).filter { it in grid }
+        }
+    }
+
+    val visited = mutableSetOf<Pos>()
+
+    dice.forEach { die ->
+        val firstRoll = die.roll()
+        var toCheck = grid.positions().filter { (_, v) -> v == firstRoll }
+            .map { (pos, _) -> pos }
+            .onEach { visited += it }
+            .toSet()
+        while (toCheck.isNotEmpty()) {
+            val nextRoll = die.roll()
+            val nextToCheck = mutableSetOf<Pos>()
+            toCheck.forEach { prev ->
+                connections[prev]!!.filter { grid[it] == nextRoll }
+                    .forEach {
+                        visited += it
+                        nextToCheck += it
+                    }
+            }
+            toCheck = nextToCheck
+        }
+    }
+
+    return visited.size
+}
 
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
