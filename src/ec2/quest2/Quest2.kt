@@ -38,7 +38,7 @@ fun part2and3(allBalloons: CharArray): Any {
     val remaining = allBalloons.toMutableList()
     while (remaining.isNotEmpty()) {
         if (remaining.size % 2 == 0) {
-            println("optimized run for ${remaining.size}")
+//            println("optimized run for ${remaining.size}")
             val marks = BooleanArray(remaining.size)
             var size = remaining.size
             repeat(remaining.size / 2) { i0 ->
@@ -58,7 +58,7 @@ fun part2and3(allBalloons: CharArray): Any {
             remaining.clear()
             remaining.addAll(newList)
         } else {
-            println("regular run for ${remaining.size}")
+//            println("regular run for ${remaining.size}")
             arrows.drawAndDestroy()
             remaining.removeFirst()
         }
