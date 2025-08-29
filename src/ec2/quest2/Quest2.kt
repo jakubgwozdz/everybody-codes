@@ -20,14 +20,15 @@ class Arrows() {
         current = null
     }
 
-    fun draw(): Char = current ?: iterator.next().also { drawn++; current = it }
+    fun drawReusable(): Char = current ?: iterator.next().also { drawn++; current = it }
+    fun drawAndDestroy(): Char = current?.also { current == null } ?: iterator.next().also { drawn++ }
 }
 
 
 fun part1(data: String): Any {
     val arrows = Arrows()
     data.forEach { balloon ->
-        if (balloon != arrows.draw()) arrows.destroy()
+        if (balloon != arrows.drawReusable()) arrows.destroy()
     }
     return arrows.drawn
 }
@@ -36,12 +37,31 @@ fun part2and3(allBalloons: CharArray): Any {
     val arrows = Arrows()
     val remaining = allBalloons.toMutableList()
     while (remaining.isNotEmpty()) {
-        val arrow = arrows.draw()
-        if (remaining.size % 2 == 0 && remaining.first() == arrow) {
-            remaining.removeAt(remaining.size / 2)
+        if (remaining.size % 2 == 0) {
+            println("optimized run for ${remaining.size}")
+            val marks = BooleanArray(remaining.size)
+            var size = remaining.size
+            repeat(remaining.size / 2) { i0 ->
+                val arrow = arrows.drawAndDestroy()
+                if (size % 2 == 0 && remaining[i0] == arrow) {
+                    marks[remaining.size - (size / 2)] = true
+                    size--
+                }
+                marks[i0] = true
+                size--
+            }
+            val newList = buildList {
+                remaining.forEachIndexed { index, balloon ->
+                    if (!marks[index]) add(balloon)
+                }
+            }
+            remaining.clear()
+            remaining.addAll(newList)
+        } else {
+            println("regular run for ${remaining.size}")
+            arrows.drawAndDestroy()
+            remaining.removeFirst()
         }
-        remaining.removeFirst()
-        arrows.destroy()
     }
     return arrows.drawn
 }
@@ -55,5 +75,5 @@ fun main() {
     go("e1", 7) { part1("GRBGGGBBBRRRRRRRR") }
     go("part1", 134) { part1(provideInput(year, quest, 1)) }
     go("part2", 21305) { part2(provideInput(year, quest, 2)) }
-    go("part3", "") { part3(provideInput(year, quest, 3)) }
+    go("part3", 21503122) { part3(provideInput(year, quest, 3)) }
 }
