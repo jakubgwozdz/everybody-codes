@@ -7,6 +7,7 @@ import provideInput
 import useGraphics
 import yearAndQuestFromPackage
 import java.awt.Color
+import java.awt.Point
 import java.awt.image.BufferedImage
 import java.lang.Thread.sleep
 import kotlin.concurrent.atomics.AtomicReference
@@ -38,33 +39,55 @@ fun part3video(data: String) {
     val animState = AtomicReference(AnimState(takenCoins.map { it.clone() }))
     val video = Quest3Video()
 
-    display(animState, "Quest 3: The Dice that Never Lie (Unless I Tell Them To)", op = video::paintOnImage)
+    display(
+        animState,
+        "Quest 3: The Dice that Never Lie (Unless I Tell Them To)",
+        location = Point(300, 200),
+        op = video::paintOnImage
+    )
 
 //    sleep(10000) // prepare recording :P
 
     var prevSize = 0
     var i = 0
 
-//    val toCheck = dice.map { die -> die to grid.placesWithFace(die.roll()) }
-//        .toMutableList()
-//
-//
+    val toCheck = dice.map { die -> die to grid.placesWithFace(die.roll()) }
+        .toMutableList()
 
-    dice.reversed().forEach { die ->
-        var toCheck = grid.placesWithFace(die.roll())
-        while (toCheck.isNotEmpty()) {
-            toCheck.forEach { (row, col) -> takenCoins[row][col] = true }
-            toCheck = grid.possibleMoves(toCheck, die.roll())
-            val newSize = takenCoins.sumOf { row -> row.count { it } }
-            if (newSize > prevSize) {
-                prevSize = newSize
-                i++
-                animState.store(AnimState(takenCoins.map { it.clone() }))
-                sleep(1L)
-//                println("$i -> $newSize")
-            }
+    while (toCheck.isNotEmpty()) {
+        val (die, positions) = toCheck.removeFirst()
+        positions.forEach { (row, col) -> takenCoins[row][col] = true }
+        val nextMoves = grid.possibleMoves(positions, die.roll())
+        if (nextMoves.isNotEmpty()) {
+            toCheck += die to nextMoves
         }
+
+        val newSize = takenCoins.sumOf { row -> row.count { it } }
+        if (newSize > prevSize) {
+            prevSize = newSize
+            i++
+            animState.store(AnimState(takenCoins.map { it.clone() }))
+            sleep(1L)
+        }
+
     }
+
+
+//    dice.reversed().forEach { die ->
+//        var toCheck = grid.placesWithFace(die.roll())
+//        while (toCheck.isNotEmpty()) {
+//            toCheck.forEach { (row, col) -> takenCoins[row][col] = true }
+//            toCheck = grid.possibleMoves(toCheck, die.roll())
+//            val newSize = takenCoins.sumOf { row -> row.count { it } }
+//            if (newSize > prevSize) {
+//                prevSize = newSize
+//                i++
+//                animState.store(AnimState(takenCoins.map { it.clone() }))
+//                sleep(1L)
+////                println("$i -> $newSize")
+//            }
+//        }
+//    }
     println(takenCoins.sumOf { row -> row.count { it } })
 }
 
