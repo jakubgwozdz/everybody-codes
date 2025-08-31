@@ -7,16 +7,18 @@ import go
 import provideInput
 import yearAndQuestFromPackage
 
+typealias Face = Int
+
 data class Die(
     val id: Int,
-    val faces: List<Int>,
+    val faces: List<Face>,
     val seed: Long,
 ) {
     private var pulse: Long = seed
     private var selected: Int = 0
     private var rollNumber: Int = 1
 
-    fun roll(): Int {
+    fun roll(): Face {
         val spin = rollNumber * pulse
         selected = ((selected + spin) % faces.size).toInt()
         pulse += spin
@@ -34,7 +36,7 @@ private fun parseDice(data: String): List<Die> = data.lines().takeWhile { !it.is
     Die(id, faces, seed)
 }
 
-typealias Grid = List<List<Int>>
+typealias Grid = List<List<Face>>
 
 private fun parseGrid(data: String): Grid =
     data.lines().dropWhile { !it.isBlank() }.filterNot { it.isBlank() }.map { line ->
@@ -77,11 +79,10 @@ fun part2(data: String): Any {
     return result.joinToString(",")
 }
 
-
 operator fun Grid.get(pos: Pos) = this.getOrNull(pos.row)?.getOrNull(pos.col)
 operator fun Grid.contains(pos: Pos) = pos.row in this.indices && pos.col in this[pos.row].indices
 
-fun Grid.positions(): Sequence<Pair<Pos, Int>> = sequence {
+fun Grid.positions(): Sequence<Pair<Pos, Face>> = sequence {
     forEachIndexed { row, line ->
         line.forEachIndexed { col, value ->
             yield(Pos(row, col) to value)
@@ -101,33 +102,31 @@ fun part3(data: String): Any {
                 Pos(row + 1, col),
                 Pos(row, col - 1),
                 Pos(row, col + 1),
-            ).filter { it in grid }
+            )
+                .filter { it in grid }
+                .map { it to grid[it]!! }
         }
     }
 
-    val visited = mutableSetOf<Pos>()
+    fun possibleMoves(previous: Set<Pos>, face: Face) = buildSet {
+        previous.flatMap { prevPos -> connections[prevPos].orEmpty() }
+            .forEach { (nextPos, nextFace) -> if (face == nextFace) add(nextPos) }
+    }
+
+    val startsForDigits: Map<Face, Set<Pos>> = grid.positions().groupBy { (_, face) -> face }
+        .mapValues { (_, v) -> v.map { (pos, _) -> pos }.toSet() }
+
+    val takenCoins = mutableSetOf<Pos>()
 
     dice.forEach { die ->
-        val firstRoll = die.roll()
-        var toCheck = grid.positions().filter { (_, v) -> v == firstRoll }
-            .map { (pos, _) -> pos }
-            .onEach { visited += it }
-            .toSet()
+        var toCheck = startsForDigits[die.roll()].orEmpty()
         while (toCheck.isNotEmpty()) {
-            val nextRoll = die.roll()
-            val nextToCheck = mutableSetOf<Pos>()
-            toCheck.forEach { prev ->
-                connections[prev]!!.filter { grid[it] == nextRoll }
-                    .forEach {
-                        visited += it
-                        nextToCheck += it
-                    }
-            }
-            toCheck = nextToCheck
+            toCheck.forEach { takenCoins += it }
+            toCheck = possibleMoves(toCheck, die.roll())
         }
     }
 
-    return visited.size
+    return takenCoins.size
 }
 
 fun main() {
