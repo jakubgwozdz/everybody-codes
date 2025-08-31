@@ -1,12 +1,15 @@
 package ec2.quest3
 
+import coords.e
+import coords.n
 import coords.pair.Pos
 import coords.pair.col
 import coords.pair.row
+import coords.s
+import coords.w
 import go
 import provideInput
 import yearAndQuestFromPackage
-import kotlin.collections.orEmpty
 
 typealias Face = Int
 
@@ -39,50 +42,30 @@ fun parseDice(data: String): List<Die> = data.lines().takeWhile { !it.isBlank() 
 }
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
-data class Grid(val grid:List<List<Face>>) : List<List<Face>> by grid {
-    operator fun get(pos: Pos) = this.getOrNull(pos.row)?.getOrNull(pos.col)
-    operator fun contains(pos: Pos) = pos.row in this.indices && pos.col in this[pos.row].indices
+data class Grid(val grid: List<List<Face>>) : List<List<Face>> by grid {
+    operator fun get(pos: Pos) = grid.getOrNull(pos.row)?.getOrNull(pos.col)
+    operator fun contains(pos: Pos) = pos.row in indices && pos.col in this[pos.row].indices
 
-    private fun places(): Sequence<Pair<Pos, Face>> = sequence {
-        forEachIndexed { row, line ->
-            line.forEachIndexed { col, value ->
-                yield(Pos(row, col) to value)
-            }
-        }
-    }
-
-    private val connections: Map<Pos, List<Pair<Pos, Face>>> by lazy {
-        places().associate { (pos, _) ->
-            val (row, col) = pos
-            val exits = listOf(
-                pos,
-                Pos(row - 1, col),
-                Pos(row + 1, col),
-                Pos(row, col - 1),
-                Pos(row, col + 1),
-            ).filter { it in this }
-            pos to exits.map { it to this[it]!! }
-        }
+    private val connections: Map<Pos, Set<Pos>> by lazy {
+        indices.flatMap { row -> this[row].indices.map { col -> Pos(row, col) } }
+            .associateWith { pos -> listOf(pos, pos.n(), pos.e(), pos.s(), pos.w()).filter { it in this }.toSet() }
     }
 
     private val byFaces: Map<Face, Set<Pos>> by lazy {
-        places().groupBy { (_, face) -> face }
-            .mapValues { (_, v) -> v.map { (pos, _) -> pos }.toSet() }
+        indices.flatMap { row -> this[row].indices.map { col -> Pos(row, col) } }
+            .groupBy { this[it]!! }.mapValues { (_, v) -> v.toSet() }
     }
 
     fun placesWithFace(face: Face) = byFaces[face].orEmpty()
 
-    fun possibleMoves(previous: Set<Pos>, face: Face): Set<Pos> = buildSet {
-        previous.flatMap { prevPos -> connections[prevPos].orEmpty() }
-            .forEach { (nextPos, nextFace) -> if (face == nextFace) add(nextPos) }
-    }
+    fun possibleMoves(previous: Set<Pos>, face: Face): Set<Pos> =
+        previous.flatMap { prevPos -> connections[prevPos].orEmpty() }.filter { this[it] == face }.toSet()
 
 }
 
-fun parseGrid(data: String): Grid =
-    data.lines().dropWhile { !it.isBlank() }.filterNot { it.isBlank() }.map { line ->
-        line.map { it.digitToInt() }
-    }.let { Grid(it) }
+fun parseGrid(data: String): Grid = data.lines().dropWhile { !it.isBlank() }.filterNot { it.isBlank() }
+    .map { line -> line.map { it.digitToInt() } }
+    .let { Grid(it) }
 
 fun part1(data: String): Any {
     val dice = parseDice(data)
