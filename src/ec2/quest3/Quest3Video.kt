@@ -72,23 +72,7 @@ fun part3video(data: String) {
 
     }
 
-
-//    dice.reversed().forEach { die ->
-//        var toCheck = grid.placesWithFace(die.roll())
-//        while (toCheck.isNotEmpty()) {
-//            toCheck.forEach { (row, col) -> takenCoins[row][col] = true }
-//            toCheck = grid.possibleMoves(toCheck, die.roll())
-//            val newSize = takenCoins.sumOf { row -> row.count { it } }
-//            if (newSize > prevSize) {
-//                prevSize = newSize
-//                i++
-//                animState.store(AnimState(takenCoins.map { it.clone() }))
-//                sleep(1L)
-////                println("$i -> $newSize")
-//            }
-//        }
-//    }
-    println(takenCoins.sumOf { row -> row.count { it } })
+//    println(takenCoins.sumOf { row -> row.count { it } })
 }
 
 fun main() {
