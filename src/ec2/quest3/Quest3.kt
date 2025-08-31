@@ -6,6 +6,7 @@ import coords.pair.row
 import go
 import provideInput
 import yearAndQuestFromPackage
+import kotlin.collections.orEmpty
 
 typealias Face = Int
 
@@ -30,19 +31,58 @@ data class Die(
     }
 }
 
-private fun parseDice(data: String): List<Die> = data.lines().takeWhile { !it.isBlank() }.map { line ->
+fun parseDice(data: String): List<Die> = data.lines().takeWhile { !it.isBlank() }.map { line ->
     val id = line.substringBefore(':').toInt()
     val faces = line.substringAfter('[').substringBefore(']').split(",").map(String::toInt)
     val seed = line.substringAfter("seed=").toLong()
     Die(id, faces, seed)
 }
 
-typealias Grid = List<List<Face>>
+@Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
+data class Grid(val grid:List<List<Face>>) : List<List<Face>> by grid {
+    operator fun get(pos: Pos) = this.getOrNull(pos.row)?.getOrNull(pos.col)
+    operator fun contains(pos: Pos) = pos.row in this.indices && pos.col in this[pos.row].indices
 
-private fun parseGrid(data: String): Grid =
+    private fun places(): Sequence<Pair<Pos, Face>> = sequence {
+        forEachIndexed { row, line ->
+            line.forEachIndexed { col, value ->
+                yield(Pos(row, col) to value)
+            }
+        }
+    }
+
+    private val connections: Map<Pos, List<Pair<Pos, Face>>> by lazy {
+        places().associate { (pos, _) ->
+            val (row, col) = pos
+            val exits = listOf(
+                pos,
+                Pos(row - 1, col),
+                Pos(row + 1, col),
+                Pos(row, col - 1),
+                Pos(row, col + 1),
+            ).filter { it in this }
+            pos to exits.map { it to this[it]!! }
+        }
+    }
+
+    private val byFaces: Map<Face, Set<Pos>> by lazy {
+        places().groupBy { (_, face) -> face }
+            .mapValues { (_, v) -> v.map { (pos, _) -> pos }.toSet() }
+    }
+
+    fun placesWithFace(face: Face) = byFaces[face].orEmpty()
+
+    fun possibleMoves(previous: Set<Pos>, face: Face): Set<Pos> = buildSet {
+        previous.flatMap { prevPos -> connections[prevPos].orEmpty() }
+            .forEach { (nextPos, nextFace) -> if (face == nextFace) add(nextPos) }
+    }
+
+}
+
+fun parseGrid(data: String): Grid =
     data.lines().dropWhile { !it.isBlank() }.filterNot { it.isBlank() }.map { line ->
         line.map { it.digitToInt() }
-    }
+    }.let { Grid(it) }
 
 fun part1(data: String): Any {
     val dice = parseDice(data)
@@ -80,50 +120,16 @@ fun part2(data: String): Any {
     return result.joinToString(",")
 }
 
-operator fun Grid.get(pos: Pos) = this.getOrNull(pos.row)?.getOrNull(pos.col)
-operator fun Grid.contains(pos: Pos) = pos.row in this.indices && pos.col in this[pos.row].indices
-
-fun Grid.positions(): Sequence<Pair<Pos, Face>> = sequence {
-    forEachIndexed { row, line ->
-        line.forEachIndexed { col, value ->
-            yield(Pos(row, col) to value)
-        }
-    }
-}
-
 fun part3(data: String): Any {
     val dice = parseDice(data)
     val grid = parseGrid(data)
-    val connections = buildMap {
-        grid.positions().forEach { (pos, _) ->
-            val (row, col) = pos
-            this[pos] = listOf(
-                pos,
-                Pos(row - 1, col),
-                Pos(row + 1, col),
-                Pos(row, col - 1),
-                Pos(row, col + 1),
-            )
-                .filter { it in grid }
-                .map { it to grid[it]!! }
-        }
-    }
-
-    fun possibleMoves(previous: Set<Pos>, face: Face) = buildSet {
-        previous.flatMap { prevPos -> connections[prevPos].orEmpty() }
-            .forEach { (nextPos, nextFace) -> if (face == nextFace) add(nextPos) }
-    }
-
-    val startsForDigits: Map<Face, Set<Pos>> = grid.positions().groupBy { (_, face) -> face }
-        .mapValues { (_, v) -> v.map { (pos, _) -> pos }.toSet() }
-
     val takenCoins = grid.map { BooleanArray(it.size) }
 
     dice.forEach { die ->
-        var toCheck = startsForDigits[die.roll()].orEmpty()
+        var toCheck = grid.placesWithFace(die.roll())
         while (toCheck.isNotEmpty()) {
-            toCheck.forEach { (row,col)-> takenCoins[row][col] = true }
-            toCheck = possibleMoves(toCheck, die.roll())
+            toCheck.forEach { (row, col) -> takenCoins[row][col] = true }
+            toCheck = grid.possibleMoves(toCheck, die.roll())
         }
     }
     return takenCoins.sumOf { row -> row.count { it } }
