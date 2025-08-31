@@ -16,7 +16,8 @@ data class Die(
 ) {
     private var pulse: Long = seed
     private var selected: Int = 0
-    private var rollNumber: Int = 1
+    var rollNumber: Int = 1
+        private set
 
     fun roll(): Face {
         val spin = rollNumber * pulse
@@ -116,17 +117,16 @@ fun part3(data: String): Any {
     val startsForDigits: Map<Face, Set<Pos>> = grid.positions().groupBy { (_, face) -> face }
         .mapValues { (_, v) -> v.map { (pos, _) -> pos }.toSet() }
 
-    val takenCoins = mutableSetOf<Pos>()
+    val takenCoins = grid.map { BooleanArray(it.size) }
 
     dice.forEach { die ->
         var toCheck = startsForDigits[die.roll()].orEmpty()
         while (toCheck.isNotEmpty()) {
-            toCheck.forEach { takenCoins += it }
+            toCheck.forEach { (row,col)-> takenCoins[row][col] = true }
             toCheck = possibleMoves(toCheck, die.roll())
         }
     }
-
-    return takenCoins.size
+    return takenCoins.sumOf { row -> row.count { it } }
 }
 
 fun main() {
