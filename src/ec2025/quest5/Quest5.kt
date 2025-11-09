@@ -11,12 +11,6 @@ fun main() {
     go("part3", 30329994) { part3(provideInput(year, quest, 3)) }
 }
 
-data class Segment(val left: Int?, val mid: Int, val right: Int?)
-
-typealias Fishbone = List<Segment>
-
-data class Sword(val id: Int, val fishbone: Fishbone)
-
 fun part1(data: String): Any = data.toSword().fishbone.quality()
 
 fun part2(data: String) = data.lines()
@@ -26,9 +20,8 @@ fun part2(data: String) = data.lines()
 fun part3(data: String) = data.lines()
     .map { it.toSword() }
     .sortedWith(swordComparator.reversed())
-    .map { (id, _) -> id }
     .withIndex()
-    .sumOf { (i, id) -> (i + 1) * id }
+    .sumOf { (i, sword) -> (i + 1) * sword.id }
 
 private fun String.toSword() = split(":").let { (id, fishbone) -> Sword(id.toInt(), fishbone.toFishbone()) }
 
@@ -51,20 +44,21 @@ private fun String.toFishbone(): Fishbone {
     return fishbone.toList()
 }
 
-private fun Fishbone.quality() = joinToString("") { it.mid.toString() }.toLong()
+data class Segment(val left: Int?, val mid: Int, val right: Int?)
 
-private fun Segment.score() = listOfNotNull(left, mid, right).joinToString("").toInt()
+fun Segment.score() = listOfNotNull(left, mid, right).joinToString("").toInt()
 
-private val fishboneComparator = Comparator<Fishbone> { a, b ->
-    a.indices.forEach { i ->
-        val a1 = a[i].score()
-        val b1 = b[i].score()
-        if (a1 != b1) return@Comparator a1 - b1
-    }
-    0
+typealias Fishbone = List<Segment>
+
+fun Fishbone.quality() = joinToString("") { it.mid.toString() }.toLong()
+
+data class Sword(val id: Int, val fishbone: Fishbone)
+
+val fishboneComparator = Comparator<Fishbone> { a, b ->
+    require(a.size == b.size) { "different lengths" }
+    a.indices.firstNotNullOfOrNull { i -> (a[i].score() - b[i].score()).takeIf { it != 0 } } ?: 0
 }
 
-private val swordComparator = compareBy<Sword> { (_, fishbone) -> fishbone.quality() }
-    .thenBy(fishboneComparator) { (_, fishbone) -> fishbone }
-    .thenBy { (id, _) -> id }
-
+val swordComparator = compareBy<Sword> { it.fishbone.quality() }
+    .thenBy(fishboneComparator) { it.fishbone }
+    .thenBy { it.id }
