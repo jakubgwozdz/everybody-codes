@@ -11,7 +11,7 @@ fun main() {
     go("part2", 3949) { part2(provideInput(year, quest, 2)) }
     go("part3a", 34) { part3("AABCBABCABCabcabcABCCBAACBCa", 1, 10) }
     go("part3a", 72) { part3("AABCBABCABCabcabcABCCBAACBCa", 2, 10) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 1664411854) { part3(provideInput(year, quest, 3)) }
 }
 
 fun part1(data: String): Any {
@@ -19,7 +19,7 @@ fun part1(data: String): Any {
     var result = 0
     data.forEach { ch ->
         when {
-            ch.isUpperCase() -> mentors.compute(ch) { _, i -> (i ?: 0) + 1 }
+            ch.isUpperCase() -> mentors[ch] = (mentors[ch] ?: 0) + 1
             ch == 'a' -> result += mentors[ch.uppercaseChar()] ?: 0
         }
     }
@@ -31,26 +31,26 @@ fun part2(data: String): Any {
     var result = 0
     data.forEach { ch ->
         when {
-            ch.isUpperCase() -> mentors.compute(ch) { _, i -> (i ?: 0) + 1 }
+            ch.isUpperCase() -> mentors[ch] = (mentors[ch] ?: 0) + 1
             else -> result += mentors[ch.uppercaseChar()] ?: 0
         }
     }
     return result
 }
 
-//1664251015 first char ok, len ok
 fun part3(data: String, repetitions: Long = 1000, maxDistance: Int = 1000): Any {
-    val mentors = mutableMapOf<Char, MutableSet<Int>>()
-    data.forEachIndexed { index, ch ->
-        if (ch.isUpperCase()) mentors.getOrPut(ch) { mutableSetOf() }.add(index)
+    val positions = buildMap {
+        data.forEachIndexed { index, ch -> getOrPut(ch) { mutableSetOf() }.add(index) }
     }
-    return data.withIndex().filter { (_, ch) -> ch.isLowerCase() }.sumOf { (index, ch) ->
-        val m = mentors[ch.uppercaseChar()].orEmpty()
-        var result = repetitions * m.count { it in (index - maxDistance..index + maxDistance) }
-        if (index < maxDistance)
-            result += (repetitions - 1) * m.count { it >= data.length + index - maxDistance }
-        if (index > data.length - maxDistance)
-            result += (repetitions - 1) * m.count { it <= index - data.length + maxDistance }
-        result
+    return positions.entries.filter { (ch) -> ch.isLowerCase() }.sumOf { (ch, mentees) ->
+        mentees.sumOf { index ->
+            val mentors = positions[ch.uppercaseChar()].orEmpty()
+            var result = repetitions * mentors.count { it in (index - maxDistance..index + maxDistance) }
+            if (index < maxDistance)
+                result += (repetitions - 1) * mentors.count { it >= data.length + index - maxDistance }
+            if (index > data.length - maxDistance)
+                result += (repetitions - 1) * mentors.count { it <= index - data.length + maxDistance }
+            result
+        }
     }
 }
