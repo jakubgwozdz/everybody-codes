@@ -38,19 +38,16 @@ fun part2(data: String): Any {
     return result
 }
 
-fun part3(data: String, repetitions: Long = 1000, maxDistance: Int = 1000): Any {
+fun part3(data: String, repeats: Long = 1000, dist: Int = 1000): Any {
     val positions = buildMap {
         data.forEachIndexed { index, ch -> getOrPut(ch) { mutableSetOf() }.add(index) }
     }
     return positions.entries.filter { (ch) -> ch.isLowerCase() }.sumOf { (ch, mentees) ->
+        val mentors = positions[ch.uppercaseChar()].orEmpty()
         mentees.sumOf { index ->
-            val mentors = positions[ch.uppercaseChar()].orEmpty()
-            var result = repetitions * mentors.count { it in (index - maxDistance..index + maxDistance) }
-            if (index < maxDistance)
-                result += (repetitions - 1) * mentors.count { it >= data.length + index - maxDistance }
-            if (index > data.length - maxDistance)
-                result += (repetitions - 1) * mentors.count { it <= index - data.length + maxDistance }
-            result
+            repeats * mentors.count { it in (index - dist..index + dist) } +
+                    (repeats - 1) * mentors.count { it >= data.length + index - dist } +
+                    (repeats - 1) * mentors.count { it <= index - data.length + dist }
         }
     }
 }
