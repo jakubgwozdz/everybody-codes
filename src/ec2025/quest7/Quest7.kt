@@ -34,24 +34,18 @@ fun part2(data: String): Any {
         .sumOf { (i, _) -> i + 1 }
 }
 
-typealias Case = Pair<Pair<Char, Int>, Int> // ((ch, len), count)
-
-val Case.ch get() = first.first
-val Case.len get() = first.second
-val Case.count get() = second
-
 fun part3(data: String): Any {
     val (names, rules) = parseInputData(data)
-    var cases: List<Case> = names.filter { matchesRules(it, rules) }
+    val cases = mutableMapOf<Int, MutableMap<Char, Int>>()
+    names.filter { matchesRules(it, rules) }
         .distinctByPrefix()
-        .map { it.last() to it.length }.groupingBy { it }.eachCount()
-        .toList()
-    (1..5).forEach { i -> cases = cases.expand(i, rules) }
-    check(cases.all { it.len == 6 }) // just to make sure
-    return (6..10).sumOf { i ->
-        cases = cases.expand(i, rules)
-        cases.sumOf { it.count }
+        .forEach { name -> cases.increment(name.length, name.last()) }
+
+    (1..10).forEach { len->
+        cases[len].orEmpty().forEach { (ch, count) -> rules[ch].orEmpty().forEach { cases.increment(len + 1, it, count)} }
     }
+
+    return (7..11).sumOf { len->cases[len].orEmpty().values.sum() }
 }
 
 private fun List<String>.distinctByPrefix(): Set<String> = buildSet {
@@ -67,14 +61,8 @@ private fun List<String>.distinctByPrefix(): Set<String> = buildSet {
     }
 }
 
-private fun List<Case>.expand(i: Int, rules: Map<Char, List<Char>>) = flatMap { case ->
-    when {
-        case.len > i -> listOf(case)
-        case.len == i -> rules[case.ch].orEmpty().map { it to case.len + 1 to case.count }
-        else -> error("Invalid len ${case.len}")
-    }
-}.compress()
+fun <T> MutableMap<T, Int>.increment(k: T, i: Int = 1) =
+    put(k, getOrDefault(k, 0) + i)
 
-private fun <T> List<Pair<T, Int>>.compress() = buildMap {
-    this@compress.forEach { (pair, count) -> put(pair, getOrDefault(pair, 0) + count) }
-}.toList()
+fun <S, T> MutableMap<S, MutableMap<T, Int>>.increment(k1: S, k2: T, i: Int = 1) =
+    getOrPut(k1) { mutableMapOf() }.increment(k2, i)
