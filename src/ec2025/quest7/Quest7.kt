@@ -48,16 +48,10 @@ fun part3(data: String): Any {
     return (7..11).sumOf { len->cases[len].orEmpty().values.sum() }
 }
 
-private fun List<String>.distinctByPrefix(): Set<String> = buildSet {
-    this@distinctByPrefix.forEach { next ->
-        val prev = firstOrNull { e: String -> next.startsWith(e) || e.startsWith(next) }
-        when {
-            prev == null -> add(next)
-            prev.length > next.length -> {
-                remove(prev)
-                add(next)
-            }
-        }
+private fun List<String>.distinctByPrefix() = buildList {
+    this@distinctByPrefix.sorted().forEach { next ->
+        if (isEmpty()) add(next)
+        if (!next.startsWith(this.last())) add(next)
     }
 }
 
