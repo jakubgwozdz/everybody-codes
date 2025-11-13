@@ -30,7 +30,7 @@ fun part3(data: String) = data.parseToPairs().let { pairs ->
     }
 }
 
-private fun String.parseToPairs(): List<Pair<Int, Int>> =
+fun String.parseToPairs(): List<Pair<Int, Int>> =
     split(",").map { it.toInt() }.windowed(2).map { (a, b) -> min(a, b) to max(a, b) }
 
 fun Pair<Int, Int>.intersects(other: Pair<Int, Int>): Boolean {
