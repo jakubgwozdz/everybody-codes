@@ -18,21 +18,23 @@ fun part1(data: String) = data.parseToPairs()
     .count { (a, b) -> a + 16 == b }
 
 fun part2(data: String) = data.parseToPairs().let { pairs ->
-    pairs.indices.sumOf { i -> pairs.subList(0, i).count { intersects(it, pairs[i]) } }
+    pairs.indices.sumOf { i -> pairs.subList(0, i).count { it.intersects(pairs[i]) } }
 }
 
 fun part3(data: String) = data.parseToPairs().let { pairs ->
     (2..256).maxOf { b ->
-        (1..<b).maxOf { a -> pairs.count { intersects(it, a to b) || it == a to b } }
+        (1..<b).maxOf { a ->
+            val other = a to b
+            pairs.count { it.intersects(other) || it == other }
+        }
     }
 }
 
 private fun String.parseToPairs(): List<Pair<Int, Int>> =
     split(",").map { it.toInt() }.windowed(2).map { (a, b) -> min(a, b) to max(a, b) }
-        .sortedWith(compareBy({ it.first }, { it.second }))
 
-fun intersects(p1: Pair<Int, Int>, p2: Pair<Int, Int>): Boolean {
-    val (a, b) = p1
-    val (c, d) = p2
+fun Pair<Int, Int>.intersects(other: Pair<Int, Int>): Boolean {
+    val (a, b) = this
+    val (c, d) = other
     return (a < c && c < b && b < d) || (c < a && a < d && d < b)
 }
