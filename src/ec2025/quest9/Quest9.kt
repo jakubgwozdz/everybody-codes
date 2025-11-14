@@ -21,15 +21,26 @@ fun degree(child: Scale, parents: Pair<Scale, Scale>) =
             child.dna.indices.count { child.dna[it] == parents.second.dna[it] }
 
 fun matchParentsToChildren(scales: List<Scale>): List<Pair<Scale, Pair<Scale, Scale>>> = measureTimedValue {
-    val pairs = (0..<scales.lastIndex).asSequence().flatMap { i1 -> (i1 + 1..scales.lastIndex).map { i2 -> i1 to i2 } }
-        .map { (i1, i2) -> scales[i1] to scales[i2] }
-    scales.mapNotNull { child ->
-        pairs.firstOrNull { (p1, p2) ->
-            p1.id != child.id && p2.id != child.id &&
-                    child.dna.indices.all { child.dna[it] == p1.dna[it] || child.dna[it] == p2.dna[it] }
-        }?.let { child to it }
+    buildList {
+        scales.forEach { child -> possibleMatch(scales, child)?.let { add(it) } }
     }
 }.loggedTimed("matchParentsToChildren()")
+
+private fun possibleMatch(scales: List<Scale>, child: Scale): Pair<Scale, Pair<Scale, Scale>>? {
+    val sortedScales = scales.map { p -> p to child.dna.indices.count { child.dna[it] != p.dna[it] } }
+        .sortedBy { it.second }
+    repeat(sortedScales.lastIndex) { i1 ->
+        val (p1, miss1) = sortedScales[i1]
+        if (miss1 > 64) return null // no chance we can find a match
+        val missing = child.dna.indices.filter { child.dna[it] != p1.dna[it] }
+        if (p1.id != child.id) (i1 + 1..sortedScales.lastIndex).forEach { i2 ->
+            val (p2, miss2) = sortedScales[i2]
+            if (miss1 + miss2 > 128) return@repeat
+            if (p2.id != child.id && missing.all { child.dna[it] == p2.dna[it] }) return (child to (p1 to p2))
+        }
+    }
+    return null
+}
 
 private fun String.parse(): List<Scale> = measureTimedValue {
     lines().map { it.split(":") }.map { (id, dna) -> Scale(id.toInt(), dna) }
