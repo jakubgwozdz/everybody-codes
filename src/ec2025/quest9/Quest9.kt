@@ -1,8 +1,10 @@
 package ec2025.quest9
 
 import go
+import loggedTimed
 import provideInput
 import yearAndQuestFromPackage
+import kotlin.time.measureTimedValue
 
 
 fun main() {
@@ -18,18 +20,20 @@ fun degree(child: Scale, parents: Pair<Scale, Scale>) =
     child.dna.indices.count { child.dna[it] == parents.first.dna[it] } *
             child.dna.indices.count { child.dna[it] == parents.second.dna[it] }
 
-fun matchParentsToChildren(scales: List<Scale>): List<Pair<Scale, Pair<Scale, Scale>>> {
+fun matchParentsToChildren(scales: List<Scale>): List<Pair<Scale, Pair<Scale, Scale>>> = measureTimedValue {
     val pairs = (0..<scales.lastIndex).asSequence().flatMap { i1 -> (i1 + 1..scales.lastIndex).map { i2 -> i1 to i2 } }
         .map { (i1, i2) -> scales[i1] to scales[i2] }
-    return scales.mapNotNull { child ->
-        pairs.filter { (p1, p2) -> p1.id != child.id && p2.id != child.id }
-            .filter { (p1, p2) -> child.dna.indices.all { child.dna[it] == p1.dna[it] || child.dna[it] == p2.dna[it] } }
-            .singleOrNull()?.let { child to it }
+    scales.mapNotNull { child ->
+        pairs.firstOrNull { (p1, p2) ->
+            p1.id != child.id && p2.id != child.id &&
+                    child.dna.indices.all { child.dna[it] == p1.dna[it] || child.dna[it] == p2.dna[it] }
+        }?.let { child to it }
     }
-}
+}.loggedTimed("matchParentsToChildren()")
 
-private fun String.parse(): List<Scale> =
+private fun String.parse(): List<Scale> = measureTimedValue {
     lines().map { it.split(":") }.map { (id, dna) -> Scale(id.toInt(), dna) }
+}.loggedTimed("parse()")
 
 fun part1(data: String) = part2(data)
 
@@ -37,15 +41,20 @@ fun part2(data: String) = matchParentsToChildren(data.parse()).sumOf { (child, p
 
 fun part3(data: String): Any {
     val scales = data.parse()
-    val indices = scales.indices.associateBy { scales[it].id }
-    val uf = UnionFind<Int>(scales.size) { indices[it]!! }
+    val childrenWithParents = matchParentsToChildren(scales)
 
-    matchParentsToChildren(scales).forEach { (child, parents) ->
-        uf.union(child.id, parents.first.id)
-        uf.union(child.id, parents.second.id)
-    }
+    val largest = measureTimedValue {
+//        val indices = scales.indices.associateBy { scales[it].id }
+//        val uf = UnionFind<Int>(scales.size) { indices[it]!! }
+        val uf = UnionFind<Int>(scales.size) { it - 1 }
+        childrenWithParents.forEach { (child, parents) ->
+            uf.union(child.id, parents.first.id)
+            uf.union(child.id, parents.second.id)
+        }
 
-    return scales.map { it.id }.groupBy { uf.find(it) }.maxBy { it.value.size }.value.sum()
+        scales.map { it.id }.groupBy { uf.find(it) }.maxBy { it.value.size }
+    }.loggedTimed("union-find")
+    return largest.value.sum()
 }
 
 class UnionFind<T>(size: Int, val indexOp: (T) -> Int) {

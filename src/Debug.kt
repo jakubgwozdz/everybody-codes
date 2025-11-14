@@ -1,6 +1,7 @@
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
+import kotlin.time.TimedValue
 
 private val logger = LoggerFactory.getLogger("Debug")
 
@@ -25,3 +26,5 @@ fun debug(delay: Duration? = null, op: () -> Any) {
 }
 
 inline fun <T> T.debug(crossinline op: (T) -> Any? = { it }): T = also { debug(op(this)) }
+
+fun <T> TimedValue<T>.loggedTimed(desc: String) = debug { "$desc took $duration" }.value
