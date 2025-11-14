@@ -6,7 +6,6 @@ import yearAndQuestFromPackage
 import kotlin.math.max
 import kotlin.math.min
 
-
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1", 64) { part1(provideInput(year, quest, 1)) }
