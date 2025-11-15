@@ -66,7 +66,7 @@ fun part1(data: String, rounds: Int = 4): Any {
 
     val visited = dragon.toMutableSet()
     repeat(rounds) {
-        dragon = dragon.moveDragon(grid).filter { it !in visited }.toSet()
+        dragon = dragon.dragonMoves(grid).filter { it !in visited }.toSet()
         visited += dragon
     }
     return visited.count { it in sheep }
@@ -79,9 +79,9 @@ fun part2(data: String, rounds: Int = 20): Any {
     val hides = chars['#']!!
     var result = 0
     repeat(rounds) {
-        dragon = dragon.moveDragon(grid)
+        dragon = dragon.dragonMoves(grid)
         sheep = sheep.eat(dragon, hides).also { result += sheep.size - it.size }
-        sheep = sheep.moveSheep(grid)
+        sheep = sheep.sheepMoves(grid)
         sheep = sheep.eat(dragon, hides).also { result += sheep.size - it.size }
     }
     return result
@@ -92,13 +92,13 @@ private fun Set<Pos>.eat(dragon: Set<Pos>, hides: Set<Pos>): Set<Pos> = filter {
 private operator fun List<String>.contains(pos: Pos): Boolean =
     pos.row in indices && pos.col in this[pos.row].indices
 
-private fun Set<Pos>.moveSheep(grid: List<String>): Set<Pos> =
+private fun Set<Pos>.sheepMoves(grid: List<String>): Set<Pos> =
     mapNotNull { (r, c) -> (r + 1 to c).takeIf { it in grid } }.toSet()
 
-private fun Set<Pos>.moveDragon(grid: List<String>): Set<Pos> =
-    flatMap { it.moveDragon(grid) }.toSet()
+private fun Set<Pos>.dragonMoves(grid: List<String>): Set<Pos> =
+    flatMap { it.dragonMoves(grid) }.toSet()
 
-private fun Pos.moveDragon(grid: List<String>): Set<Pos> =
+private fun Pos.dragonMoves(grid: List<String>): Set<Pos> =
     moves.mapNotNull { (dr, dc) -> (row + dr to col + dc).takeIf { it in grid } }.toSet()
 
 data class State(val dragon: Pos, val sheep: List<Int?>) {
@@ -112,54 +112,52 @@ private fun Collection<Pos>.toStr() = joinToString(",", prefix = "[", postfix = 
 fun part3(data: String): Any {
     val (grid, chars) = parse(data)
     var result = 0L
-    val toCheck = mutableMapOf<State, Long>()
-    toCheck.increment(
-        State(
-            chars['D']!!.single(),
-            grid.first().indices.map { c -> chars['S']!!.firstOrNull { it.second == c }?.first })
+    var toCheck = mapOf(
+        State(chars['D']!!.single(), grid.first().indices.map { c -> chars['S']!!.firstOrNull { it.col == c }?.row })
+                to 1L
     )
-    val hides = chars['#']!!
+//    val hides = chars['#']!!
     var round = 0
+    var statesChecked = 0L
 
-    while (toCheck.isNotEmpty()) {
+    while (toCheck.isNotEmpty()) toCheck = buildMap {
         round++
-        val toCheckNext = mutableMapOf<State, Long>()
-        while (toCheck.isNotEmpty()) {
-            val (curr, count) = toCheck.entries.first()
-            toCheck.remove(curr)
+        toCheck.forEach { (curr, count) ->
+            statesChecked++
             if (curr.sheep.all { it == null }) {
                 result += count
-                continue
-            }
-            val possibleSheepMoves: List<List<Int?>> = buildList {
-                curr.sheep.indices.forEach { c ->
-                    val r = curr.sheep[c]
-                    val next = r?.let { it + 1 to c }
-                    when {
-                        r == null -> {} // skip, no sheep
-                        next == curr.dragon && next !in hides -> {} // skip, illegal
-                        else -> add(curr.sheep.mapIndexed { c1, r -> if (c1 == c) r!! + 1 else r })
-                    }
-                }
-            }
-                .ifEmpty { listOf(curr.sheep) }
-                .filter { sheep -> sheep.all { it == null || it in grid.indices } }
-            val possibleDragonMoves = curr.dragon.moveDragon(grid)
-            possibleSheepMoves.forEach { sheep ->
-                possibleDragonMoves.forEach { dragon ->
-                    val aliveSheep = sheep.mapIndexed { c, r ->
-                        when {
-                            r == null -> null
-                            r to c == dragon && r to c !in hides -> null
-                            else -> r
+            } else {
+                val possibleSheepMoves: List<List<Int?>> = curr.sheep.singleSheepMoves(grid, curr.dragon)
+                val possibleDragonMoves = curr.dragon.dragonMoves(grid)
+                possibleSheepMoves.forEach { sheep ->
+                    possibleDragonMoves.forEach { dragon ->
+                        val aliveSheep = sheep.mapIndexed { c, r ->
+                            when {
+                                r != null && r to c == dragon && grid[r][c] != '#' -> null
+                                else -> r
+                            }
                         }
+                        increment(State(dragon, aliveSheep), count)
                     }
-                    toCheckNext.increment(State(dragon, aliveSheep), count)
                 }
             }
         }
-        toCheck.putAll(toCheckNext)
-        debug { "round $round, result $result, to check next round ${toCheck.size}" }
+        debug { "round $round, $statesChecked checked, $size to check, result $result" }
     }
     return result
 }
+
+private fun List<Int?>.singleSheepMoves(
+    grid: List<String>,
+    dragon: Pos
+): List<List<Int?>> = buildList {
+    this@singleSheepMoves.forEachIndexed { c, r ->
+        when {
+            r == null -> {} // skip, no sheep
+            r + 1 to c == dragon && grid[r + 1][c] != '#' -> {} // skip, illegal
+            else -> add(this@singleSheepMoves.mapIndexed { c1, r1 -> if (c1 == c) r + 1 else r1 })
+        }
+    }
+}
+    .ifEmpty { listOf(this) }
+    .filter { sheep -> sheep.all { it == null || it in grid.indices } }
