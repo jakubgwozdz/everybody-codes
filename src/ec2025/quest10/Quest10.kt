@@ -1,11 +1,12 @@
 package ec2025.quest10
 
 import collections.increment
+import coords.pair.col
+import coords.pair.row
 import debug
 import go
 import provideInput
 import yearAndQuestFromPackage
-import java.time.Duration
 
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
@@ -43,7 +44,7 @@ fun main() {
         #.D.#
     """.trimIndent()
     go("part3ex4", 13033988838) { part3(part3ex4) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 42444382367832) { part3(provideInput(year, quest, 3)) }
 }
 
 typealias Pos = Pair<Int, Int>
@@ -89,7 +90,7 @@ fun part2(data: String, rounds: Int = 20): Any {
 private fun Set<Pos>.eat(dragon: Set<Pos>, hides: Set<Pos>): Set<Pos> = filter { it !in dragon || it in hides }.toSet()
 
 private operator fun List<String>.contains(pos: Pos): Boolean =
-    pos.first in indices && pos.second in this[pos.first].indices
+    pos.row in indices && pos.col in this[pos.row].indices
 
 private fun Set<Pos>.moveSheep(grid: List<String>): Set<Pos> =
     mapNotNull { (r, c) -> (r + 1 to c).takeIf { it in grid } }.toSet()
@@ -98,45 +99,67 @@ private fun Set<Pos>.moveDragon(grid: List<String>): Set<Pos> =
     flatMap { it.moveDragon(grid) }.toSet()
 
 private fun Pos.moveDragon(grid: List<String>): Set<Pos> =
-    moves.mapNotNull { (dr, dc) -> (first + dr to second + dc).takeIf { it in grid } }.toSet()
+    moves.mapNotNull { (dr, dc) -> (row + dr to col + dc).takeIf { it in grid } }.toSet()
 
-data class State(val dragon: Pos, val sheep: Set<Pos>) {
-    override fun toString() = "dragon=${dragon.toStr()}, sheep=${sheep.toStr()}"
+data class State(val dragon: Pos, val sheep: List<Int?>) {
+    override fun toString() =
+        "dragon=${dragon.toStr()}, sheep=${sheep.mapIndexedNotNull { c, r -> r?.let { it to c } }.toStr()}"
 }
 
-private fun Pos.toStr() = "${'A' + second}${first + 1}"
+private fun Pos.toStr() = "${'A' + col}${row + 1}"
 private fun Collection<Pos>.toStr() = joinToString(",", prefix = "[", postfix = "]") { it.toStr() }
 
 fun part3(data: String): Any {
     val (grid, chars) = parse(data)
     var result = 0L
     val toCheck = mutableMapOf<State, Long>()
-    toCheck.increment(State(chars['D']!!.single(), chars['S']!!))
+    toCheck.increment(
+        State(
+            chars['D']!!.single(),
+            grid.first().indices.map { c -> chars['S']!!.firstOrNull { it.second == c }?.first })
+    )
     val hides = chars['#']!!
+    var round = 0
 
     while (toCheck.isNotEmpty()) {
-//        val (curr, count) = toCheck.entries.first()
-        val (curr, count) = toCheck.entries.minBy { (_, c) -> c }
-        toCheck.remove(curr)
-        if (curr.sheep.isEmpty()) {
-            result += count
-            continue
-        }
-        val possibleSheepMoves = curr.sheep.mapNotNull { lamb ->
-            val (lr, lc) = lamb
-            val nextLamb = lr + 1 to lc
-            if (nextLamb in hides || nextLamb != curr.dragon) curr.sheep - lamb + nextLamb else null
-        }
-            .ifEmpty { listOf(curr.sheep) }
-            .filter { sheep -> sheep.all { it in grid } }
-        val possibleDragonMoves = curr.dragon.moveDragon(grid)
-        possibleSheepMoves.forEach { sheep ->
-            possibleDragonMoves.forEach { dragon ->
-                toCheck.increment(State(dragon, sheep.filter { it != dragon || it in hides }.toSet()), count)
+        round++
+        val toCheckNext = mutableMapOf<State, Long>()
+        while (toCheck.isNotEmpty()) {
+            val (curr, count) = toCheck.entries.first()
+            toCheck.remove(curr)
+            if (curr.sheep.all { it == null }) {
+                result += count
+                continue
+            }
+            val possibleSheepMoves: List<List<Int?>> = buildList {
+                curr.sheep.indices.forEach { c ->
+                    val r = curr.sheep[c]
+                    val next = r?.let { it + 1 to c }
+                    when {
+                        r == null -> {} // skip, no sheep
+                        next == curr.dragon && next !in hides -> {} // skip, illegal
+                        else -> add(curr.sheep.mapIndexed { c1, r -> if (c1 == c) r!! + 1 else r })
+                    }
+                }
+            }
+                .ifEmpty { listOf(curr.sheep) }
+                .filter { sheep -> sheep.all { it == null || it in grid.indices } }
+            val possibleDragonMoves = curr.dragon.moveDragon(grid)
+            possibleSheepMoves.forEach { sheep ->
+                possibleDragonMoves.forEach { dragon ->
+                    val aliveSheep = sheep.mapIndexed { c, r ->
+                        when {
+                            r == null -> null
+                            r to c == dragon && r to c !in hides -> null
+                            else -> r
+                        }
+                    }
+                    toCheckNext.increment(State(dragon, aliveSheep), count)
+                }
             }
         }
-        debug(Duration.ofSeconds(1)) { toCheck.size }
-//        toCheck.forEach { (state, count) -> debug("${count}x $state") }
+        toCheck.putAll(toCheckNext)
+        debug { "round $round, result $result, to check next round ${toCheck.size}" }
     }
     return result
 }
