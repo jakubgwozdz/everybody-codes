@@ -37,16 +37,18 @@ fun part2(data: String): Any {
 
 fun part3(data: String): Any {
     val (names, rules) = parseInputData(data)
+    val distinctNames = names.filter { matchesRules(it, rules) }.distinctByPrefix()
+
     val cases = mutableMapOf<Int, MutableMap<Char, Int>>()
-    names.filter { matchesRules(it, rules) }
-        .distinctByPrefix()
-        .forEach { name -> cases.increment(name.length, name.last()) }
 
-    (1..10).forEach { len->
-        cases[len].orEmpty().forEach { (ch, count) -> rules[ch].orEmpty().forEach { cases.increment(len + 1, it, count)} }
+    distinctNames.forEach { name -> cases.increment(name.length, name.last()) }
+    (0..10).forEach { len ->
+        val thisCases = cases[len]
+        val nextCases = cases.getOrPut(len + 1) { mutableMapOf() }
+        thisCases?.forEach { (ch, count) -> rules[ch]?.forEach { nextCases.increment(it, count) } }
+//        println("len ${len + 1}: ${nextCases.toSortedMap()}")
     }
-
-    return (7..11).sumOf { len->cases[len].orEmpty().values.sum() }
+    return (7..11).sumOf { len -> cases[len]?.values?.sum() ?: 0 }
 }
 
 private fun List<String>.distinctByPrefix() = buildList {
