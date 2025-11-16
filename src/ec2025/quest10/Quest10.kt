@@ -107,39 +107,39 @@ private fun Pos.dragonMoves(grid: List<String>): List<Pos> =
     dragonMovesCache(this to grid)
 //    moves.mapNotNull { (dr, dc) -> (row + dr to col + dc).takeIf { it in grid } }
 
-data class State(val dragon: Pos, val sheep: List<Int?>)
-
 fun part3(data: String): Any {
     val (grid, chars) = parse(data)
     var result = 0L
     val dragon = chars['D']!!.single()
     val sheep = grid.first().indices.map { c -> chars['S']!!.firstOrNull { it.col == c }?.row }
-    var toCheck = mapOf(State(dragon, sheep) to 1L)
+    var toCheck = mapOf(dragon to mapOf(sheep to 1L))
     var round = 0
     var statesChecked = 0L
-    val validRows = grid.first().indices.map { c -> 0..grid.indexOfLast { it[c] != '#' }}
+    val validRows =
+        grid.first().indices.map { c -> sheep[c]?.let { it..grid.indexOfLast { it[c] != '#' } } ?: IntRange.EMPTY }
 
     while (toCheck.isNotEmpty()) {
         round++
         val (toCheckNext, finished) = round(toCheck, grid, validRows)
         result += finished
-        statesChecked += toCheck.size
-        debug { "round $round, $statesChecked checked, ${toCheckNext.size} to check, result $result" }
+        statesChecked += toCheck.entries.sumOf { (_, inner) -> inner.size }
+        debug { "round $round, $statesChecked checked, ${toCheckNext.entries.sumOf { (_, inner) -> inner.size }} to check, result $result" }
         toCheck = toCheckNext
     }
     return result
 }
 
 private fun round(
-    toCheck: Map<State, Long>,
+    toCheck: Map<Pos, Map<List<Int?>, Long>>,
     grid: List<String>,
     validRows: List<IntRange>,
-): Pair<Map<State, Long>, Long> {
+): Pair<Map<Pos, Map<List<Int?>, Long>>, Long> {
     var finished = 0L
-    val toCheckNext = buildMap<State, Long> {
-        toCheck.forEach { (curr, count) ->
-            val possibleSheepMoves: List<List<Int?>> = curr.sheep.singleSheepMoves(grid, curr.dragon, validRows)
-            curr.dragon.dragonMoves(grid).forEach { dragon ->
+    val toCheckNext = mutableMapOf<Pos, MutableMap<List<Int?>, Long>>()
+    toCheck.forEach { (currDragon, inner) ->
+        inner.forEach { (currSheep, count) ->
+            val possibleSheepMoves: List<List<Int?>> = currSheep.singleSheepMoves(grid, currDragon, validRows)
+            currDragon.dragonMoves(grid).forEach { dragon ->
                 possibleSheepMoves.forEach { sheep ->
                     val aliveSheep = sheep.mapIndexed { c, r ->
                         when {
@@ -147,7 +147,7 @@ private fun round(
                             else -> r
                         }
                     }
-                    if (aliveSheep.any { it != null }) increment(State(dragon, aliveSheep), count)
+                    if (aliveSheep.any { it != null }) toCheckNext.increment(dragon, aliveSheep, count)
                     else finished += count
                 }
             }
