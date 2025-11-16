@@ -1,12 +1,9 @@
 package ec2025.quest10
 
 import collections.Cached
-import collections.increment
 import coords.pair.col
 import coords.pair.row
-import debug
 import go
-import logged
 import provideInput
 import yearAndQuestFromPackage
 
@@ -103,7 +100,7 @@ private fun Set<Pos>.sheepMoves(board: Board): Set<Pos> =
 private fun Set<Pos>.dragonMoves(board: Board): Set<Pos> =
     flatMap { board.dragonMovesCached(it) }.toSet()
 
-data class Board(val grid: List<String>) {
+class Board(val grid: List<String>) {
     val dragonCols = grid.first().indices
     val dragonColsCount = dragonCols.count()
     val dragonRows = grid.indices
@@ -116,9 +113,6 @@ data class Board(val grid: List<String>) {
         if (first == -1) IntRange.EMPTY else first..last
     }
     val sheepRowsCounts = sheepRows.map { it.count() }
-        .logged("sheepRowsCounts")
-
-    val legitStates = sheepCols.fold(dragonRowsCount * dragonColsCount) { acc, c -> acc * (sheepRowsCounts[c] + 1) }
 
     fun dragonMoves(dragon: Pos): List<Pair<Int, Int>> =
         moves.mapNotNull { (dr, dc) -> (dragon.row + dr to dragon.col + dc).takeIf { it in grid } }
@@ -126,8 +120,10 @@ data class Board(val grid: List<String>) {
     val dragonMovesCached = Cached(::dragonMoves)
     val solveP3StateCached = Cached(::solveP3State)
 
+    val bases = sheepRowsCounts.map { it + 1 } + dragonRowsCount + dragonColsCount
+    val possibleStates = bases.fold(1, Int::times)
     val indexer = Indexer(
-        sheepRowsCounts.map { it + 1 } + dragonRowsCount + dragonColsCount,
+        bases,
         { (dragon, sheep) ->
             IntArray(sheepRowsCounts.size + 2) { c ->
                 when (c) {
@@ -156,43 +152,35 @@ fun part3(data: String): Any {
     var result = 0L
     val dragon = chars['D']!!.single()
     val sheep = board.sheepCols.map { c -> chars['S']!!.firstOrNull { it.col == c }?.row }
-    var toCheck = mapOf(dragon to mapOf(sheep to 1L))
-    var round = 0
-    var statesChecked = 0L
+    var toCheck = LongArray(board.possibleStates).also { it[board.stateToIndex(dragon, sheep)] = 1 }
 
-    while (toCheck.isNotEmpty()) {
-        round++
+    while (toCheck.any { it > 0 }) {
         val (toCheckNext, finished) = round(toCheck, board)
         result += finished
-        statesChecked += toCheck.entries.sumOf { (_, inner) -> inner.size }
-        debug { "round $round, $statesChecked checked, ${toCheckNext.entries.sumOf { (_, inner) -> inner.size }} to check, result $result" }
         toCheck = toCheckNext
     }
     return result
 }
 
 private fun round(
-    toCheck: Map<Pos, Map<Sheep, Long>>,
+    toCheck: LongArray,
     board: Board,
-): Pair<Map<Pos, Map<Sheep, Long>>, Long> {
+): Pair<LongArray, Long> {
     var finished = 0L
-    val toCheckNext = mutableMapOf<Pos, MutableMap<Sheep, Long>>()
-    toCheck.forEach { (currDragon, inner) ->
-        inner.forEach { (currSheep, count) ->
-//            val index = board.stateToIndex(currDragon, currSheep)
-//            val (d, s) = board.indexToState(index)
-//            check(d == currDragon && s == currSheep) { "index $index is not a valid state for $currDragon $currSheep, returned $d $s" }
-            val (innerToCheck, won) = board.solveP3State(currDragon to currSheep)
-            innerToCheck.forEach { (d, l) -> l.forEach { (s, c) -> toCheckNext.increment(d, s, c * count) } }
+    val toCheckNext = LongArray(board.possibleStates)
+    toCheck.forEachIndexed { index, count ->
+        if (count > 0) {
+            val (innerToCheck, won) = board.solveP3State(board.indexToState(index))
+            innerToCheck.forEach { (d, s) -> toCheckNext[board.stateToIndex(d, s)] += count }
             finished += won * count
         }
     }
     return toCheckNext to finished
 }
 
-fun Board.solveP3State(state: Pair<Pos, Sheep>): Pair<Map<Pos, Map<Sheep, Long>>, Long> {
+fun Board.solveP3State(state: Pair<Pos, Sheep>): Pair<List<Pair<Pos, Sheep>>, Long> {
     val (currDragon, currSheep) = state
-    val innerToCheck = mutableMapOf<Pos, MutableMap<Sheep, Long>>()
+    val innerToCheck = mutableListOf<Pair<Pos, Sheep>>()
     var won = 0L
     val possibleSheepMoves: List<Sheep> = singleSheepMoves(currDragon, currSheep)
     val possibleDragonMoves = dragonMovesCached(currDragon)
@@ -204,7 +192,7 @@ fun Board.solveP3State(state: Pair<Pos, Sheep>): Pair<Map<Pos, Map<Sheep, Long>>
                     else -> r
                 }
             }
-            if (aliveSheep.any { it != null }) innerToCheck.increment(nextDragon, aliveSheep)
+            if (aliveSheep.any { it != null }) innerToCheck += nextDragon to aliveSheep
             else won++
         }
     }
@@ -228,10 +216,8 @@ private fun Board.singleSheepMoves(
 
 class Indexer<T>(val bases: List<Int>, val ser: (T) -> IntArray, val deser: (IntArray) -> T) {
     val multipliers = bases
-//        .logged("bases")
         .asReversed()
         .runningFold(1) { acc, b -> acc * b }.reversed().drop(1)
-//        .logged("multipliers")
 
     fun indexOf(t: T): Int = ser(t).let { ints -> ints.indices.sumOf { ints[it] * multipliers[it] } }
     fun valueOf(index: Int): T {
