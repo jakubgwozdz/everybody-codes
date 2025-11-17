@@ -4,6 +4,7 @@ import collections.Cached
 import coords.pair.col
 import coords.pair.row
 import go
+import logged
 import provideInput
 import yearAndQuestFromPackage
 
@@ -47,7 +48,8 @@ fun main() {
 }
 
 typealias Pos = Pair<Int, Int>
-typealias Sheep = List<Int?>
+typealias Sheep = IntArray
+//typealias Sheep = List<Int?>
 
 private fun parse(data: String): Pair<List<String>, Map<Char, Set<Pos>>> {
     val grid = data.lines()
@@ -127,7 +129,7 @@ class Board(val grid: List<String>) {
         { (dragon, sheep) ->
             IntArray(sheepRowsCounts.size + 2) { c ->
                 when (c) {
-                    in sheep.indices -> sheep[c]?.let { it + 1 } ?: 0
+                    in sheep.indices -> sheep[c] + 1
                     sheep.size -> dragon.row
                     sheep.size + 1 -> dragon.col
                     else -> error("invalid index $c")
@@ -135,7 +137,7 @@ class Board(val grid: List<String>) {
             }
         },
         { ints ->
-            val sheep: Sheep = ints.take(sheepRowsCounts.size).map { if (it == 0) null else it - 1 }
+            val sheep: Sheep = IntArray(sheepRowsCounts.size) { c-> ints[c] - 1 }
             val dragonRow = ints[sheepRowsCounts.size]
             val dragonCol = ints[sheepRowsCounts.size + 1]
             Pos(dragonRow, dragonCol) to sheep
@@ -151,7 +153,7 @@ fun part3(data: String): Any {
     val board = Board(grid)
     var result = 0L
     val dragon = chars['D']!!.single()
-    val sheep = board.sheepCols.map { c -> chars['S']!!.firstOrNull { it.col == c }?.row }
+    val sheep = IntArray(board.sheepCols.count()) { c -> chars['S']!!.firstOrNull { it.col == c }?.row ?: -1 }
     var toCheck = LongArray(board.possibleStates).also { it[board.stateToIndex(dragon, sheep)] = 1 }
 
     while (toCheck.any { it > 0 }) {
@@ -186,13 +188,14 @@ fun Board.solveP3State(state: Pair<Pos, Sheep>): Pair<List<Pair<Pos, Sheep>>, Lo
     val possibleDragonMoves = dragonMovesCached(currDragon)
     possibleDragonMoves.forEach { nextDragon ->
         possibleSheepMoves.forEach { nextSheep ->
-            val aliveSheep = nextSheep.mapIndexed { c, r ->
+            val aliveSheep = IntArray(nextSheep.size) { c ->
+                val r = nextSheep[c]
                 when {
-                    r != null && r to c == nextDragon && grid[r][c] != '#' -> null
+                    r to c == nextDragon && grid[r][c] != '#' -> -1
                     else -> r
                 }
             }
-            if (aliveSheep.any { it != null }) innerToCheck += nextDragon to aliveSheep
+            if (aliveSheep.any { it >= 0 }) innerToCheck += nextDragon to aliveSheep
             else won++
         }
     }
@@ -205,19 +208,21 @@ private fun Board.singleSheepMoves(
 ): List<Sheep> = buildList {
     sheep.forEachIndexed { c, r ->
         when {
-            r == null -> {} // skip, no sheep
+            r == -1 -> {} // skip, no sheep
             r + 1 to c == dragon && grid[r + 1][c] != '#' -> {} // skip, illegal
-            else -> add(sheep.mapIndexed { c1, r1 -> if (c1 == c) r + 1 else r1 })
+            else -> add(IntArray(sheep.size) { c1 -> val r1 = sheep[c1]; if (c1 == c) r + 1 else r1 })
         }
     }
 }
     .ifEmpty { listOf(sheep) }
-    .filter { sheep -> sheep.indices.all { c -> sheep[c] == null || sheep[c] in sheepRows[c] } }
+    .filter { sheep -> sheep.indices.all { c -> sheep[c] == -1 || sheep[c] in sheepRows[c] } }
 
 class Indexer<T>(val bases: List<Int>, val ser: (T) -> IntArray, val deser: (IntArray) -> T) {
     val multipliers = bases
+        .logged("bases")
         .asReversed()
         .runningFold(1) { acc, b -> acc * b }.reversed().drop(1)
+        .logged("multipliers")
 
     fun indexOf(t: T): Int = ser(t).let { ints -> ints.indices.sumOf { ints[it] * multipliers[it] } }
     fun valueOf(index: Int): T {
