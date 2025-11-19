@@ -70,9 +70,8 @@ private fun List<String>.process(
                 it.row in indices && it.col in this[it.row].indices
                 && this[it.row][it.col] <= this[curr.row][curr.col] && filter(it)
             ) {
-                if (it in cache) {
-                    destroyed += cache[it]!!
-                } else toGo.add(it)
+                if (it in cache) destroyed += cache[it]!!
+                else toGo.add(it)
             }
         }
     }
