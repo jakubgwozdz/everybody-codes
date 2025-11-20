@@ -28,8 +28,11 @@ fun part3(data: String): Any {
     return solve(ranges, 202520252025)
 }
 
+private val IntRange.length: Int get() = (last - first + 1) / step
+private operator fun IntRange.get(i: Int): Int = first + i * step
+
 private fun solve(ranges: List<IntRange>, count: Long): Int {
-    val size = ranges.sumOf { it.last - it.first + 1 } + 1
+    val size = ranges.sumOf { it.length } + 1
     val pos = (count % size).toInt()
     if (pos == 0) return 1
 
@@ -37,9 +40,12 @@ private fun solve(ranges: List<IntRange>, count: Long): Int {
     var j = size - 1
     var clockwise = true
     ranges.forEach { r ->
-        r.forEach { d ->
-            val p = if (clockwise) i++ else j--
-            if (p == pos) return d
+        if (clockwise) {
+            i += r.length
+            if (pos < i) return r[pos - i - r.length]
+        } else {
+            j -= r.length
+            if (pos > j) return r[j + r.length - pos]
         }
         clockwise = !clockwise
     }
