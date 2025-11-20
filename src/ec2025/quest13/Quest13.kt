@@ -26,7 +26,7 @@ fun main() {
 private fun parse(data: String): List<Pair<Long, Long>> = data.lines().map { it.split('-').map(String::toLong) }
     .map {
         val first = it[0]
-        val last = it.getOrElse(1) { first }
+        val last = it.getOrNull(1) ?: first
         first to last - first + 1
     }
 
