@@ -29,20 +29,20 @@ fun part3(data: String): Any {
 }
 
 private fun solve(ranges: List<IntRange>, count: Long): Int {
-    val size = ranges.sumOf { it.last - it.first + 1 }
-    val dial = IntArray(size + 1)
-    dial[0] = 1
+    val size = ranges.sumOf { it.last - it.first + 1 } + 1
+    val pos = (count % size).toInt()
+    if (pos == 0) return 1
+
     var i = 1
-    var j = dial.size - 1
+    var j = size - 1
     var clockwise = true
     ranges.forEach { r ->
-        if (clockwise) {
-            r.forEach { d -> dial[i++] = d }
-        } else {
-            r.forEach { d -> dial[j--] = d }
+        r.forEach { d ->
+            val p = if (clockwise) i++ else j--
+            if (p == pos) return d
         }
         clockwise = !clockwise
     }
-    return dial[(count % dial.size).toInt()]
+    error("WAT")
 }
 
