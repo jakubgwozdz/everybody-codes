@@ -7,16 +7,6 @@ import yearAndQuestFromPackage
 
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
-//    val ex = """
-//        10-15
-//        12-13
-//        20-21
-//        19-23
-//        30-37
-//    """.trimIndent()
-//    listOf(1, 10, 11, 12, 13, 14, 15, 20, 21, 30, 31, 32, 33, 34, 35, 36, 37, 23, 22, 21, 20, 19, 13, 12, 1)
-//        .forEachIndexed { i, n -> go("ex($i)", n) { part1(ex, i.toLong()) } }
-//
     go("part1", 797) { part1(provideInput(year, quest, 1)) }
     go("part2", 6558) { part2(provideInput(year, quest, 2)) }
     go("part3", 91492) { part3(provideInput(year, quest, 3)) }
