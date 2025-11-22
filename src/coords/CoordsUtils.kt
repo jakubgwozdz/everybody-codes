@@ -15,13 +15,13 @@ fun List<String>.findAll(op: (Char) -> Boolean): Set<Pos> = flatMapIndexed { r, 
 
 operator fun List<String>.get(pos: Pos): Char? = getOrNull(pos.row)?.getOrNull(pos.col)
 
-fun Pos.n(): Pos = Pos(row - 1, col)
+fun Pos.n(dist: Int = 1): Pos = Pos(row - dist, col)
 fun Pos.ne(): Pos = Pos(row - 1, col + 1)
-fun Pos.e(): Pos = Pos(row, col + 1)
+fun Pos.e(dist: Int = 1): Pos = Pos(row, col + dist)
 fun Pos.se(): Pos = Pos(row + 1, col + 1)
-fun Pos.s(): Pos = Pos(row + 1, col)
+fun Pos.s(dist: Int = 1): Pos = Pos(row + dist, col)
 fun Pos.sw(): Pos = Pos(row + 1, col - 1)
-fun Pos.w(): Pos = Pos(row, col - 1)
+fun Pos.w(dist: Int = 1): Pos = Pos(row, col - dist)
 fun Pos.nw(): Pos = Pos(row - 1, col - 1)
 
 enum class Direction {
@@ -49,12 +49,12 @@ enum class Direction {
     }
 }
 
-fun Pos.move(dir: Direction): Pos {
+fun Pos.move(dir: Direction, dist: Int = 1): Pos {
     return when (dir) {
-        Direction.N -> n()
-        Direction.E -> e()
-        Direction.S -> s()
-        Direction.W -> w()
+        Direction.N -> n(dist)
+        Direction.E -> e(dist)
+        Direction.S -> s(dist)
+        Direction.W -> w(dist)
     }
 }
 
