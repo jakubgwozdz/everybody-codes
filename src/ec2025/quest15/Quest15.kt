@@ -20,7 +20,7 @@ fun main() {
     go("part1e1", 16) { part1(part1e1) }
     go("part1", 109) { part1(provideInput(year, quest, 1)) }
     go("part2", 3689) { part2(provideInput(year, quest, 2)) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 511612640) { part3(provideInput(year, quest, 3)) }
 }
 
 fun part1(data: String): Any {
@@ -46,8 +46,18 @@ fun part1(data: String): Any {
         }
     }
 
+    // compression
+    val rows = (hWalls.keys + end.row + 0).flatMap { setOf(it, it - 1, it + 1) }.sorted().distinct()
+    val cols = (vWalls.keys + end.col + 0).flatMap { setOf(it, it - 1, it + 1) }.sorted().distinct()
+    val lookupRows = rows.withIndex().associate { (i, r) -> r to i }
+    val lookupCols = cols.withIndex().associate { (i, c) -> c to i }
+    fun compress(p: Pos) = Pos(lookupRows[p.row]?:error("$p unknown row"), lookupCols[p.col]?:error("$p unknown col"))
+    fun decompress(p: Pos) = Pos(rows[p.row], cols[p.col])
+
     fun neighbors(current: Pos): List<Pair<Pos, Int>> {
-        return Direction.entries.map(current::move)
+        val compressed = compress(current)
+        return Direction.entries.map(compressed::move)
+            .map { decompress(it) }
             .filterNot { n -> vWalls[n.col]?.any { n.row in it } == true }
             .filterNot { n -> hWalls[n.row]?.any { n.col in it } == true }
             .map { it to current.manhattanDistance(it) }
