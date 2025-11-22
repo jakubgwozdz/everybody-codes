@@ -1,6 +1,7 @@
 package ec2025.quest10
 
 import collections.Cached
+import coords.pair.Pos
 import coords.pair.col
 import coords.pair.row
 import go
@@ -47,7 +48,6 @@ fun main() {
     go("part3", 42444382367832) { part3(provideInput(year, quest, 3)) }
 }
 
-typealias Pos = Pair<Int, Int>
 typealias Sheep = IntArray
 //typealias Sheep = List<Int?>
 

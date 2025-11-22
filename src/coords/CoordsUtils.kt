@@ -33,6 +33,20 @@ enum class Direction {
         S -> N
         W -> E
     }
+
+    fun turnRight(): Direction = when (this) {
+        N -> E
+        E -> S
+        S -> W
+        W -> N
+    }
+
+    fun turnLeft(): Direction = when (this) {
+        N -> W
+        E -> N
+        S -> E
+        W -> S
+    }
 }
 
 fun Pos.move(dir: Direction): Pos {

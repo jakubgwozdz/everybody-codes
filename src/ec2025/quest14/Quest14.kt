@@ -16,7 +16,7 @@ fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1", 498) { part1(provideInput(year, quest, 1)) }
     go("part2", 1171073) { part2(provideInput(year, quest, 2)) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 978754588) { part3(provideInput(year, quest, 3)) }
 }
 
 data class State(val active: Set<Pos>, val inactive: Set<Pos>) {
@@ -57,7 +57,7 @@ fun part3(data: String): Any {
         val (index, state) = iterator.next()
         if (!state.active.containsAll(active) || !state.inactive.containsAll(inactive)) continue
         if (state in found) {
-            val prev = found[state]!!.logged("prev")
+            val prev = found[state]!!.logged("valid at $index, prev at")
             val values = found.entries.associate { (state, index) -> index to state.value }
 
             val before = values.filterKeys { it < prev }.logged("before")
@@ -69,7 +69,7 @@ fun part3(data: String): Any {
 
             return before.values.sum() + cycles * cycle.values.sum() + remaining.values.sum()
         } else {
-            found[state] = index.logged("found")
+            found[state] = index.logged("valid at")
         }
     }
 }
