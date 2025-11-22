@@ -17,7 +17,7 @@ fun <T> reconstructPath(cameFrom: Map<T, T>, end: T): List<T> {
     return totalPath
 }
 
-fun <T : Any> astar(start: T, end: T, heuristics: (T) -> Int, neighbours: (T) -> List<Pair<T, Int>>): List<T> {
+fun <T : Any> astar(start: T, end: T, heuristics: (T) -> Int, neighbours: (T) -> Iterable<Pair<T, Int>>): List<T> {
     val comeFrom = mutableMapOf<T, T>()
     val gScore = mutableMapOf(start to 0).withDefault { Int.MAX_VALUE / 2 }
     val fScore = mutableMapOf(start to heuristics(start)).withDefault { Int.MAX_VALUE / 2 }

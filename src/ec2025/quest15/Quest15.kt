@@ -1,9 +1,13 @@
 package ec2025.quest15
 
 import coords.Direction
+import coords.manhattanDistance
 import coords.move
 import coords.pair.Pos
+import coords.pair.col
+import coords.pair.row
 import go
+import logged
 import provideInput
 import search.astar
 import yearAndQuestFromPackage
@@ -22,22 +26,35 @@ fun main() {
 fun part1(data: String): Any {
     val start = Pos(0, 0)
     var end = start
-    val walls = buildSet {
-        var d = Direction.N
-        data.split(',').forEach { m ->
-            d = when (m.first()) {
-                'L' -> d.turnLeft()
-                'R' -> d.turnRight()
-                else -> error("wrong direction $m")
-            }
-            repeat(m.drop(1).toInt()) {
-                add(end)
-                end = end.move(d)
-            }
+    val hWalls = mutableMapOf<Int, MutableList<IntRange>>()
+    val vWalls = mutableMapOf<Int, MutableList<IntRange>>()
+    var d = Direction.N
+    data.split(',').forEach { m ->
+        val from = end
+        d = when (m.first()) {
+            'L' -> d.turnLeft()
+            'R' -> d.turnRight()
+            else -> error("wrong direction $m")
+        }
+        val dist = m.drop(1).toInt()
+        end = from.move(d, dist)
+        when (d) {
+            Direction.N -> vWalls.getOrPut(from.col) { mutableListOf() }.add(end.row + 1..from.row)
+            Direction.E -> hWalls.getOrPut(from.row) { mutableListOf() }.add(from.col..end.col - 1)
+            Direction.S -> vWalls.getOrPut(from.col) { mutableListOf() }.add(from.row..end.row - 1)
+            Direction.W -> hWalls.getOrPut(from.row) { mutableListOf() }.add(end.col + 1..from.col)
         }
     }
 
-    return astar(start, end, walls).size - 1
+    fun neighbors(current: Pos): List<Pair<Pos, Int>> {
+        return Direction.entries.map(current::move)
+            .filterNot { n -> vWalls[n.col]?.any { n.row in it } == true }
+            .filterNot { n -> hWalls[n.row]?.any { n.col in it } == true }
+            .map { it to current.manhattanDistance(it) }
+    }
+
+    return astar(start, end, end::manhattanDistance, ::neighbors)
+        .windowed(2).sumOf { (a, b) -> a.manhattanDistance(b) }
 }
 
 fun part2(data: String) = part1(data)
