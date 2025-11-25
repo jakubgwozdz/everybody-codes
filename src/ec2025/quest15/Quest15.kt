@@ -51,12 +51,13 @@ fun part1(data: String): Any {
     val cols = (vWalls.keys + end.col + 0).flatMap { setOf(it, it - 1, it + 1) }.sorted().distinct()
     val lookupRows = rows.withIndex().associate { (i, r) -> r to i }
     val lookupCols = cols.withIndex().associate { (i, c) -> c to i }
-    fun compress(p: Pos) = Pos(lookupRows[p.row]?:error("$p unknown row"), lookupCols[p.col]?:error("$p unknown col"))
+    fun compress(p: Pos) = Pos(lookupRows[p.row] ?: error("$p unknown row"), lookupCols[p.col] ?: error("$p unknown col"))
     fun decompress(p: Pos) = Pos(rows[p.row], cols[p.col])
 
     fun neighbors(current: Pos): List<Pair<Pos, Int>> {
         val compressed = compress(current)
         return Direction.entries.map(compressed::move)
+            .filter { (r, c) -> r in rows.indices && c in cols.indices }
             .map { decompress(it) }
             .filterNot { n -> vWalls[n.col]?.any { n.row in it } == true }
             .filterNot { n -> hWalls[n.row]?.any { n.col in it } == true }
