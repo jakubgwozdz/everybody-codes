@@ -64,7 +64,7 @@ fun part1(data: String): Any {
             .map { it to current.manhattanDistance(it) }
     }
 
-    return astar(start, end, end::manhattanDistance, ::neighbors)
+    return astar(start, end, end::manhattanDistance, ::neighbors)!!
         .windowed(2).sumOf { (a, b) -> a.manhattanDistance(b) }
 }
 

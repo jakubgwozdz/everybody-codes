@@ -11,6 +11,8 @@ import logged
 import provideInput
 import search.astar
 import yearAndQuestFromPackage
+import kotlin.math.PI
+import kotlin.math.atan2
 
 
 fun main() {
@@ -74,29 +76,32 @@ fun main() {
 }
 
 fun Pos.dist2(r: Int, c: Int) = (row - r) * (row - r) + (col - c) * (col - c)
+fun Pos.angleTo(p: Pos): Double {
+    val dCol = p.col - col
+    val dRow = row - p.row
+    return (atan2(dCol.toDouble(), dRow.toDouble()) + 2 * PI) % (2 * PI)
+}
 
 fun part1(data: String): Any {
-    val grid = data.lines()
-    val volcano = grid.findAll('@').single()
+    val grid = data.lines().map { line -> line.map { chr -> chr.digitToIntOrNull() ?: 0 }.toIntArray() }
+    val volcano = data.lines().findAll('@').single()
     return grid.indices.sumOf { r ->
         grid[r].indices.sumOf { c ->
-            if (volcano.dist2(r, c) in 1..10 * 10) grid[r][c].digitToInt() else 0
+            if (volcano.dist2(r, c) in 1..10 * 10) grid[r][c] else 0
         }
     }
 }
 
 fun part2(data: String): Any {
-    val grid = data.lines()
-    val volcano = grid.findAll('@').single()
+    val grid = data.lines().map { line -> line.map { chr -> chr.digitToIntOrNull() ?: 0 }.toIntArray() }
+    val volcano = data.lines().findAll('@').single()
     var step = 0
     val steps = buildMap {
         while (true) {
             step++
             val range = (step - 1) * (step - 1) + 1..step * step
             val d = grid.indices.sumOf { r ->
-                grid[r].indices.sumOf { c ->
-                    if (volcano.dist2(r, c) in range) grid[r][c].digitToInt() else 0
-                }
+                grid[r].indices.sumOf { c -> if (volcano.dist2(r, c) in range) grid[r][c] else 0 }
             }
             put(step, d)
             if (d == 0) break
@@ -106,34 +111,51 @@ fun part2(data: String): Any {
 }
 
 fun part3(data: String): Any {
-    val grid = data.lines()
-    val size = (grid.size to grid.first().length).logged("size")
-    val volcano = grid.findAll('@').single().logged("volcano")
-    val start = grid.findAll('S').single().logged("start")
+    val grid = data.lines().map { line -> line.map { chr -> chr.digitToIntOrNull() ?: 0 }.toIntArray() }
+    val volcano = data.lines().findAll('@').single()
+    val start = data.lines().findAll('S').single()
     return (1..volcano.row).firstNotNullOf { step ->
-        solve(grid, start, volcano, step).takeIf { it < step * 30 }?.let { it * (step - 1) }
+//        step.logged("step")
+        solve(grid, start, volcano, step)?.takeIf { it < step * 30 }?.let { it * (step - 1) }
     }
 }
 
-fun solve(grid: List<String>, start: Pos, volcano: Pos, step: Int): Int {
-    val p1 = volcano.move(Direction.W, step)
-    val p2 = volcano.move(Direction.S, step)
-    val p3 = volcano.move(Direction.E, step)
-    var totalTime = cost(start, p1, grid, volcano, step)
-    totalTime += cost(p1, p2, grid, volcano, step)
-    totalTime += cost(p2, p3, grid, volcano, step)
-    totalTime += cost(p3, start, grid, volcano, step)
-    return totalTime
+fun solve(grid: List<IntArray>, start: Pos, volcano: Pos, step: Int): Int? {
+    val phases = 12
+    val tolerance = phases / 4
+    return astar(
+        start = 0 to start,
+        endPredicate = { (phase, pos) -> phase > phases - tolerance && pos == start },
+        heuristics = { (phase, pos) -> phases - phase },
+        neighbours = { (phase, pos) ->
+            Direction.entries.mapNotNull { d ->
+                pos.move(d).takeIf { (r, c) ->
+                    r in grid.indices && c in grid[r].indices && volcano.dist2(r, c) > (step - 1) * (step - 1)
+                }?.let { next ->
+                    val nextPhase = (volcano.angleTo(next) / (2 * PI) * phases).toInt()
+                        .takeIf { it in phase - tolerance..phase + tolerance } ?: phase
+                    nextPhase to next to grid[next.row][next.col]
+                }
+            }
+        })
+//        ?.also { l -> printlnPath(l, grid) }
+        ?.map { (phase, pos) -> pos }?.sumOf { (r, c) -> grid[r][c] }
 }
 
-private fun cost(start: Pos, end: Pos, grid: List<String>, volcano: Pos, step: Int): Int =
-    astar(start, end, heuristics = { 0 }) { it.neighbours(grid, volcano, step) }.drop(1).cost(grid)
-
-private fun List<Pos>.cost(grid: List<String>): Int = sumOf { (r, c) -> grid[r][c].digitToIntOrNull() ?: 0 }
-
-private fun Pos.neighbours(grid: List<String>, volcano: Pos, step: Int): List<Pair<Pos, Int>> =
-    Direction.entries.mapNotNull { d ->
-        move(d).takeIf { (r, c) ->
-            r in grid.indices && c in grid[r].indices && volcano.dist2(r, c) > (step - 1) * (step - 1)
+private fun printlnPath(l: List<Pair<Int, Pos>>, grid: List<IntArray>) {
+    val set = l.map { (phase, pos) ->pos }.toSet()
+    grid.indices.forEach { r ->
+        grid[r].indices.forEach { c ->
+            print(if (r to c in set) grid[r][c] else '.')
         }
-    }.map { it to (grid[it.row][it.col].digitToIntOrNull() ?: 0) }
+        println()
+    }
+//    debug {
+//        l.windowed(2).map { (a, b) ->
+//            val dir = Direction.entries.first { a.pos.move(it) == b.pos }
+//            "$dir->${b.pos}(s${b.phase}) '${grid[b.pos.row][b.pos.col]}'"
+//        }
+//    }
+}
+
+

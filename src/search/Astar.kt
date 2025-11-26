@@ -17,14 +17,22 @@ fun <T> reconstructPath(cameFrom: Map<T, T>, end: T): List<T> {
     return totalPath
 }
 
-fun <T : Any> astar(start: T, end: T, heuristics: (T) -> Int, neighbours: (T) -> Iterable<Pair<T, Int>>): List<T> {
+fun <T : Any> astar(start: T, end: T, heuristics: (T) -> Int, neighbours: (T) -> Iterable<Pair<T, Int>>) =
+    astar(start, { it == end }, heuristics, neighbours)
+
+fun <T : Any> astar(
+    start: T,
+    endPredicate: (T) -> Boolean,
+    heuristics: (T) -> Int,
+    neighbours: (T) -> Iterable<Pair<T, Int>>
+): List<T>? {
     val comeFrom = mutableMapOf<T, T>()
     val gScore = mutableMapOf(start to 0).withDefault { Int.MAX_VALUE / 2 }
     val fScore = mutableMapOf(start to heuristics(start)).withDefault { Int.MAX_VALUE / 2 }
     val toCheck = PriorityQueue({ a, b -> fScore.getValue(a) - fScore.getValue(b) }, start)
     while (toCheck.isNotEmpty()) {
         val current = toCheck.removeFirst()
-        if (current == end) return reconstructPath(comeFrom, current)
+        if (endPredicate(current)) return reconstructPath(comeFrom, current)
         neighbours(current).forEach { (neighbor, dist) ->
             val tentativeGScore = gScore.getValue(current) + dist
             if (tentativeGScore < gScore.getValue(neighbor)) {
@@ -35,11 +43,9 @@ fun <T : Any> astar(start: T, end: T, heuristics: (T) -> Int, neighbours: (T) ->
             }
         }
     }
-    error("No path from $start to $end")
+    return null
 }
 
-fun astar(start: Pos, end: Pos, walls: Set<Pos>): List<Pos> {
-    return astar(start, end, end::manhattanDistance) { current ->
-        Direction.entries.map { current.move(it) to 1 }.filterNot { (neighbor) -> neighbor in walls }
-    }
+fun astar(start: Pos, end: Pos, walls: Set<Pos>) = astar(start, end, end::manhattanDistance) { current ->
+    Direction.entries.map { current.move(it) to 1 }.filterNot { (neighbor) -> neighbor in walls }
 }
