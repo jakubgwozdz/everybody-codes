@@ -110,34 +110,19 @@ fun part3(data: String): Any {
     val size = (grid.size to grid.first().length).logged("size")
     val volcano = grid.findAll('@').single().logged("volcano")
     val start = grid.findAll('S').single().logged("start")
-    var min = 1
-    var max = volcano.row
-    var step = 1
-    while (true) {
-        step++
-        step.logged("step")
-        val totalTime = solve(grid, start, volcano, step)
-        if (totalTime >= 0) return totalTime * (step - 1)
+    return (1..volcano.row).firstNotNullOf { step ->
+        solve(grid, start, volcano, step).takeIf { it < step * 30 }?.let { it * (step - 1) }
     }
 }
 
 fun solve(grid: List<String>, start: Pos, volcano: Pos, step: Int): Int {
-    val maxTime = (step * 30).logged("maxTime") - 1
     val p1 = volcano.move(Direction.W, step)
     val p2 = volcano.move(Direction.S, step)
     val p3 = volcano.move(Direction.E, step)
     var totalTime = cost(start, p1, grid, volcano, step)
-    totalTime.logged("totalTime after p1")
-    if (totalTime > maxTime) return -1
     totalTime += cost(p1, p2, grid, volcano, step)
-    totalTime.logged("totalTime after p2")
-    if (totalTime > maxTime) return -1
     totalTime += cost(p2, p3, grid, volcano, step)
-    totalTime.logged("totalTime after p3")
-    if (totalTime > maxTime) return -1
     totalTime += cost(p3, start, grid, volcano, step)
-    totalTime.logged("totalTime after full circle")
-    if (totalTime > maxTime) return -1
     return totalTime
 }
 
