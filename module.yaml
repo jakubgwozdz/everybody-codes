@@ -7,5 +7,3 @@ dependencies:
 settings:
   kotlin:
     serialization: json
-  java:
-    compileIncrementally: true
