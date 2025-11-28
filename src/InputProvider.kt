@@ -24,7 +24,7 @@ fun provideInput(event: Int, quest: Int, part: Int, invalidate: Boolean = false)
                 .also { require(it != "0") { "Seed must not be 0" } }
 
             val encryptedInput = cachingDownloadGetKey(
-                "https://everybody-codes.b-cdn.net/assets/$event/$quest/input/$seed.json",
+                "https://everybody.codes/assets/$event/$quest/input/$seed.json",
                 part.toString(),
                 invalidate,
             )
