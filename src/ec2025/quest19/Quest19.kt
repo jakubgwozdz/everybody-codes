@@ -12,7 +12,6 @@ fun main() {
     go("part3", 4850006) { part3(provideInput(year, quest, 3)) }
 }
 
-// 56 first correct
 fun part1(data: String): Any {
     val walls = data.lines().map { it.split(",").map(String::toInt) }
         .groupBy { (d, _, _) -> d }.values.map { it.minBy { (_, h, _) -> h } }
