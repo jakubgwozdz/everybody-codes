@@ -39,17 +39,20 @@ fun main() {
     go("part3", 467) { part3(provideInput(year, quest, 3)) }
 }
 
-fun Pos.neighbours() = when (row % 2) {
-    0 -> listOf(Pos(row - 1, col), Pos(row + 1, col - 1), Pos(row + 1, col))
-    else -> listOf(Pos(row - 1, col), Pos(row - 1, col + 1), Pos(row + 1, col))
-}
+fun Pos.neighbours(): List<Pos> = listOf(
+    row - 1 to col,
+    row + 1 to col,
+    if (row % 2 == 0) row + 1 to col - 1 else row - 1 to col + 1,
+)
+
+fun Pos.rotateJumper(size: Int): Pos = Pos(size - 1 - row - 2 * col, row / 2)
 
 private fun skew(data: String): List<String> = data.lines().mapIndexed { i, line -> line.drop(i).dropLast(i) }
     .flatMap { l ->
         mutableListOf(StringBuilder(), StringBuilder()).also {
             l.forEachIndexed { j, c -> it[j % 2].append(c) }
         }
-    }.map { it.toString() }
+    }.map { it.toString() }.filter { it.isNotBlank() }
 
 
 fun part1(data: String): Any {
@@ -77,10 +80,8 @@ fun part3(data: String): Any {
     val end = skewed.findAll('E').single()
     val places = skewed.findAll('T') + end
 
-    fun Pos.rotate(): Pos = Pos(skewed.size - 2 - row - 2 * col, row / 2)
-
     return dijkstra(start, end) { p: Pos ->
-        p.rotate().run { neighbours() + this }
+        p.rotateJumper(skewed.size).run { neighbours() + this }
             .filter(places::contains)
             .map { it to 1 }
     }
