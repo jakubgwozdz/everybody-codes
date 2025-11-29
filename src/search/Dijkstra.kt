@@ -18,3 +18,6 @@ fun <T : Any> dijkstra(start: T, endPredicate: (T) -> Boolean, neighbours: (T) -
     }
     error("No path found")
 }
+
+fun <T : Any> dijkstra(start: T, end: T, neighbours: (T) -> Iterable<Pair<T, Int>>) =
+    dijkstra(start, { it == end }, neighbours)

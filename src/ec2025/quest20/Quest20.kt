@@ -1,13 +1,10 @@
 package ec2025.quest20
 
-import collections.PriorityQueue
 import coords.findAll
-import coords.get
 import coords.pair.Pos
 import coords.pair.col
 import coords.pair.row
 import go
-import logged
 import provideInput
 import search.dijkstra
 import yearAndQuestFromPackage
@@ -39,7 +36,7 @@ fun main() {
         .........S.........
     """.trimIndent()
     go("part3ex1", 23) { part3(part3ex1) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 467) { part3(provideInput(year, quest, 3)) }
 }
 
 fun Pos.neighbours() = when (row % 2) {
@@ -57,14 +54,8 @@ private fun skew(data: String): List<String> = data.lines().mapIndexed { i, line
 
 fun part1(data: String): Any {
     val skewed = skew(data)
-    return skewed.indices.sumOf { r ->
-        when (r % 2) {
-            0 -> skewed[r].indices.sumOf { c ->
-                if (skewed[r][c] == 'T') Pos(r, c).neighbours().count { skewed[it] == 'T' } else 0
-            }
-            else -> 0
-        }
-    }
+    val places = skewed.findAll('T')
+    return places.filter { it.row % 2 == 0 }.sumOf { it.neighbours().count(places::contains) }
 }
 
 fun part2(data: String): Any {
@@ -73,11 +64,11 @@ fun part2(data: String): Any {
     val end = skewed.findAll('E').single()
     val places = skewed.findAll('T') + end
 
-    return dijkstra(
-        start,
-        endPredicate = { p: Pos -> p == end },
-        neighbours = { p: Pos -> p.neighbours().filter(places::contains).map { it to 1 } }
-    )
+    return dijkstra(start, end) { p: Pos ->
+        p.neighbours()
+            .filter(places::contains)
+            .map { it to 1 }
+    }
 }
 
 fun part3(data: String): Any {
@@ -86,12 +77,11 @@ fun part3(data: String): Any {
     val end = skewed.findAll('E').single()
     val places = skewed.findAll('T') + end
 
-    val size = skewed.size.logged("size")
-    require(skewed.first().length == size)
+    fun Pos.rotate(): Pos = Pos(skewed.size - 2 - row - 2 * col, row / 2)
 
-    return dijkstra(
-        start,
-        endPredicate = { p: Pos -> p == end },
-        neighbours = { p: Pos -> p.neighbours().filter(places::contains).map { it to 1 } }
-    )
+    return dijkstra(start, end) { p: Pos ->
+        p.rotate().run { neighbours() + this }
+            .filter(places::contains)
+            .map { it to 1 }
+    }
 }
