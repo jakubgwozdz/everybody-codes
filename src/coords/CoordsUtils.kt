@@ -5,11 +5,11 @@ import coords.pair.col
 import coords.pair.row
 import kotlin.math.abs
 
-fun List<String>.findAll(ch: Char): Set<Pos> = flatMapIndexed { r, line ->
+fun List<CharSequence>.findAll(ch: Char): Set<Pos> = flatMapIndexed { r, line ->
     line.mapIndexedNotNull { c, ch1 -> if (ch1 == ch) Pos(r, c) else null }
 }.toSet()
 
-fun List<String>.findAll(op: (Char) -> Boolean): Set<Pos> = flatMapIndexed { r, line ->
+fun List<CharSequence>.findAll(op: (Char) -> Boolean): Set<Pos> = flatMapIndexed { r, line ->
     line.mapIndexedNotNull { c, ch -> if (op(ch)) Pos(r, c) else null }
 }.toSet()
 
