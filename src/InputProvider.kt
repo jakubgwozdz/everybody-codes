@@ -19,7 +19,7 @@ fun provideInput(event: Int, quest: Int, part: Int, invalidate: Boolean = false)
         try {
             val cookie = File("local/ec-cookie").readText().trim()
 
-            val seed = cachingDownloadGetKey("https://everybody.codes/api/user/me", "seed", invalidate, cookie)
+            val seed = cachingDownloadGetKey("https://api.everybody.codes/user/me", "seed", invalidate, cookie)
                 .also { logger.info("seed: $it") }
                 .also { require(it != "0") { "Seed must not be 0" } }
 
@@ -31,7 +31,7 @@ fun provideInput(event: Int, quest: Int, part: Int, invalidate: Boolean = false)
                 .hexToByteArray()
 
             val (key, iv) = cachingDownloadGetKey(
-                "https://everybody.codes/api/event/$event/quest/$quest",
+                "https://api.everybody.codes/event/$event/quest/$quest",
                 "key$part",
                 invalidate,
                 cookie
