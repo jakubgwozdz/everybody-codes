@@ -47,23 +47,69 @@ data class Node(
     fun matchesStrongly(socket: Pair<String, String>) = plug == socket
     fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
 
-    fun addRequireStrong(node: Node): AddResult = when {
-        left == null && node.matchesStrongly(leftSocket) -> AcceptedDirectly.also { left = node }
-        left?.addRequireStrong(node) == AcceptedDirectly -> AcceptedDirectly
-        right == null && node.matchesStrongly(rightSocket) -> AcceptedDirectly.also { right = node }
-        right?.addRequireStrong(node) == AcceptedDirectly -> AcceptedDirectly
-        else -> DeniedOrReplaced(node)
+    fun tryStrong(branch: Node): AddResult {
+        var b = branch
+        val l = left
+        if (l == null) {
+            if (branch.matchesStrongly(leftSocket)) {
+                left = b
+                return AcceptedDirectly
+            }
+        } else {
+            val remaining = l.tryStrong(b)
+            if (remaining is DeniedOrReplaced) b = remaining.remaining
+            else return AcceptedIndirectly
+        }
+        val r = right
+        if (r == null) {
+            if (branch.matchesStrongly(rightSocket)) {
+                right = b
+                return AcceptedDirectly
+            }
+        } else {
+            val remaining = r.tryStrong(b)
+            if (remaining is DeniedOrReplaced) b = remaining.remaining
+            else return AcceptedIndirectly
+        }
+        return DeniedOrReplaced(b)
     }
 
-    fun addAllowingWeak(node: Node): AddResult = when {
+    fun tryWeak(branch: Node): AddResult {
+        var b = branch
+        val l = left
+        if (l == null) {
+            if (branch.matchesWeakly(leftSocket)) {
+                left = b
+                return AcceptedDirectly
+            }
+        } else {
+            val remaining = l.tryWeak(b)
+            if (remaining is DeniedOrReplaced) b = remaining.remaining
+            else return AcceptedIndirectly
+        }
+        val r = right
+        if (r == null) {
+            if (branch.matchesWeakly(rightSocket)) {
+                right = b
+                return AcceptedDirectly
+            }
+        } else {
+            val remaining = r.tryWeak(b)
+            if (remaining is DeniedOrReplaced) b = remaining.remaining
+            else return AcceptedIndirectly
+        }
+        return DeniedOrReplaced(b)
+    }
+
+    fun tryWeak1(node: Node): AddResult = when {
         left == null && node.matchesWeakly(leftSocket) -> AcceptedDirectly.also { left = node }
-        left?.addAllowingWeak(node) == AcceptedDirectly -> AcceptedDirectly
+        left?.tryWeak1(node) == AcceptedDirectly -> AcceptedDirectly
         right == null && node.matchesWeakly(rightSocket) -> AcceptedDirectly.also { right = node }
-        right?.addAllowingWeak(node) == AcceptedDirectly -> AcceptedDirectly
+        right?.tryWeak1(node) == AcceptedDirectly -> AcceptedDirectly
         else -> DeniedOrReplaced(node)
     }
 
-    fun addReplacingWeaker(branch: Node): AddResult {
+    fun tryReplacingWeaker(branch: Node): AddResult {
         var b = branch
         val l = left
         if (l == null) {
@@ -75,7 +121,7 @@ data class Node(
             left = b
             b = l
         } else {
-            val remaining = l.addReplacingWeaker(b)
+            val remaining = l.tryReplacingWeaker(b)
             if (remaining is DeniedOrReplaced) b = remaining.remaining
             else return AcceptedIndirectly
         }
@@ -89,7 +135,7 @@ data class Node(
             right = b
             b = r
         } else {
-            val remaining = r.addReplacingWeaker(b)
+            val remaining = r.tryReplacingWeaker(b)
             if (remaining is DeniedOrReplaced) b = remaining.remaining
             else return AcceptedIndirectly
         }
@@ -114,11 +160,11 @@ fun solve(data: String, op: Node.(Node) -> Node.AddResult): Any {
 
 }
 
-fun part1(data: String) = solve(data, Node::addRequireStrong)
+fun part1(data: String) = solve(data, Node::tryStrong)
 
-fun part2(data: String) = solve(data, Node::addAllowingWeak)
+fun part2(data: String) = solve(data, Node::tryWeak)
 
-fun part3(data: String) = solve(data, Node::addReplacingWeaker)
+fun part3(data: String) = solve(data, Node::tryReplacingWeaker)
 
 fun Node.play() {
     val synth = MidiSystem.getSynthesizer()
