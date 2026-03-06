@@ -1,5 +1,7 @@
 package ec3.quest3
 
+import ec3.quest3.Node.AddResult.Accepted
+import ec3.quest3.Node.AddResult.DeniedOrReplaced
 import go
 import provideInput
 import yearAndQuestFromPackage
@@ -44,41 +46,55 @@ data class Node(
     fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
 
     fun addRequireStrong(node: Node): AddResult = when {
-        left == null && node.matchesStrongly(leftSocket) -> AddResult.Accepted.also { left = node }
-        left?.addRequireStrong(node) == AddResult.Accepted -> AddResult.Accepted
-        right == null && node.matchesStrongly(rightSocket) -> AddResult.Accepted.also { right = node }
-        right?.addRequireStrong(node) == AddResult.Accepted -> AddResult.Accepted
-        else -> AddResult.DeniedOrReplaced(node)
+        left == null && node.matchesStrongly(leftSocket) -> Accepted.also { left = node }
+        left?.addRequireStrong(node) == Accepted -> Accepted
+        right == null && node.matchesStrongly(rightSocket) -> Accepted.also { right = node }
+        right?.addRequireStrong(node) == Accepted -> Accepted
+        else -> DeniedOrReplaced(node)
     }
 
     fun addAllowingWeak(node: Node): AddResult = when {
-        left == null && node.matchesWeakly(leftSocket) -> AddResult.Accepted.also { left = node }
-        left?.addAllowingWeak(node) == AddResult.Accepted -> AddResult.Accepted
-        right == null && node.matchesWeakly(rightSocket) -> AddResult.Accepted.also { right = node }
-        right?.addAllowingWeak(node) == AddResult.Accepted -> AddResult.Accepted
-        else -> AddResult.DeniedOrReplaced(node)
+        left == null && node.matchesWeakly(leftSocket) -> Accepted.also { left = node }
+        left?.addAllowingWeak(node) == Accepted -> Accepted
+        right == null && node.matchesWeakly(rightSocket) -> Accepted.also { right = node }
+        right?.addAllowingWeak(node) == Accepted -> Accepted
+        else -> DeniedOrReplaced(node)
     }
 
     fun addReplacing(branch: Node): Node? {
         var b = branch
-        if (left == null && b.matchesWeakly(leftSocket)) {
-            left = b
-            return null
+        val l = left
+        if (l == null) {
+            if (b.matchesWeakly(leftSocket)) {
+                left = b
+                return null
+            }
+        } else {
+            if (!l.matchesStrongly(leftSocket) && b.matchesStrongly(leftSocket)) {
+                left = b
+                b = l
+            } else {
+                val remaining = l.addReplacing(b)
+                if (remaining == null) return remaining
+                b = remaining
+            }
         }
-        if (left != null && left?.plug != leftSocket && b.plug == leftSocket) {
-            val t = left!!
-            left = b
-            b = t
-        } else if (left != null) b = left?.addReplacing(b) ?: return null
-        if (right == null && b.matchesWeakly(rightSocket)) {
-            right = b
-            return null
+        val r = right
+        if (r == null) {
+            if (b.matchesWeakly(rightSocket)) {
+                right = b
+                return null
+            }
+        } else {
+            if (!r.matchesStrongly(rightSocket) && b.matchesStrongly(rightSocket)) {
+                right = b
+                b = r
+            } else {
+                val remaining = r.addReplacing(b)
+                if (remaining == null) return remaining
+                b = remaining
+            }
         }
-        if (right != null && right?.plug != rightSocket && b.plug == rightSocket) {
-            val t = right!!
-            right = b
-            b = t
-        } else if (right != null) b = right?.addReplacing(b) ?: return null
         return b
     }
 
@@ -93,9 +109,9 @@ fun part1(data: String): Any {
     while (nodes.isNotEmpty()) {
         val it = nodes.removeFirst()
         tree.addRequireStrong(it)
-            .also { if (it is Node.AddResult.DeniedOrReplaced) nodes.addFirst(it.remaining) }
+            .also { if (it is DeniedOrReplaced) nodes.addFirst(it.remaining) }
     }
-    tree.play()
+//    tree.play()
     return tree.checksum()
 }
 
@@ -105,9 +121,9 @@ fun part2(data: String): Any {
     while (nodes.isNotEmpty()) {
         val it = nodes.removeFirst()
         tree.addAllowingWeak(it)
-            .also { if (it is Node.AddResult.DeniedOrReplaced) nodes.addFirst(it.remaining) }
+            .also { if (it is DeniedOrReplaced) nodes.addFirst(it.remaining) }
     }
-    tree.play()
+//    tree.play()
     return tree.checksum()
 }
 
@@ -118,12 +134,11 @@ fun part3(data: String): Any {
         val it = nodes.removeFirst()
         tree.addReplacing(it)?.let { nodes.addFirst(it) }
     }
-    tree.play()
+//    tree.play()
     return tree.checksum()
 }
 
 fun Node.play() {
-    return
     val synth = MidiSystem.getSynthesizer()
     synth.open()
     Thread.sleep(160)
