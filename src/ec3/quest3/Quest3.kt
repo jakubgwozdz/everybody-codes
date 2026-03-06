@@ -34,22 +34,29 @@ data class Node(
     var left: Node? = null,
     var right: Node? = null,
 ) {
-    fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
 
-    fun addRequireStrong(node: Node): Boolean = when {
-        left == null && node.plug == leftSocket -> true.also { left = node }
-        left?.addRequireStrong(node) == true -> true
-        right == null && node.plug == rightSocket -> true.also { right = node }
-        right?.addRequireStrong(node) == true -> true
-        else -> false
+    sealed interface AddResult {
+        object Accepted : AddResult
+        data class DeniedOrReplaced(val remaining: Node) : AddResult
     }
 
-    fun addAllowingWeak(node: Node): Boolean = when {
-        left == null && node.matchesWeakly(leftSocket) -> true.also { left = node }
-        left?.addAllowingWeak(node) == true -> true
-        right == null && node.matchesWeakly(rightSocket) -> true.also { right = node }
-        right?.addAllowingWeak(node) == true -> true
-        else -> false
+    fun matchesStrongly(socket: Pair<String, String>) = plug == socket
+    fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
+
+    fun addRequireStrong(node: Node): AddResult = when {
+        left == null && node.matchesStrongly(leftSocket) -> AddResult.Accepted.also { left = node }
+        left?.addRequireStrong(node) == AddResult.Accepted -> AddResult.Accepted
+        right == null && node.matchesStrongly(rightSocket) -> AddResult.Accepted.also { right = node }
+        right?.addRequireStrong(node) == AddResult.Accepted -> AddResult.Accepted
+        else -> AddResult.DeniedOrReplaced(node)
+    }
+
+    fun addAllowingWeak(node: Node): AddResult = when {
+        left == null && node.matchesWeakly(leftSocket) -> AddResult.Accepted.also { left = node }
+        left?.addAllowingWeak(node) == AddResult.Accepted -> AddResult.Accepted
+        right == null && node.matchesWeakly(rightSocket) -> AddResult.Accepted.also { right = node }
+        right?.addAllowingWeak(node) == AddResult.Accepted -> AddResult.Accepted
+        else -> AddResult.DeniedOrReplaced(node)
     }
 
     fun addReplacing(branch: Node): Node? {
@@ -81,17 +88,25 @@ data class Node(
 }
 
 fun part1(data: String): Any {
-    val nodes = parse(data)
-    val tree = nodes.first()
-    nodes.drop(1).forEach { tree.addRequireStrong(it) }
+    val nodes = parse(data).toMutableList()
+    val tree = nodes.removeFirst()
+    while (nodes.isNotEmpty()) {
+        val it = nodes.removeFirst()
+        tree.addRequireStrong(it)
+            .also { if (it is Node.AddResult.DeniedOrReplaced) nodes.addFirst(it.remaining) }
+    }
     tree.play()
     return tree.checksum()
 }
 
 fun part2(data: String): Any {
-    val nodes = parse(data)
-    val tree = nodes.first()
-    nodes.drop(1).forEach { tree.addAllowingWeak(it) }
+    val nodes = parse(data).toMutableList()
+    val tree = nodes.removeFirst()
+    while (nodes.isNotEmpty()) {
+        val it = nodes.removeFirst()
+        tree.addAllowingWeak(it)
+            .also { if (it is Node.AddResult.DeniedOrReplaced) nodes.addFirst(it.remaining) }
+    }
     tree.play()
     return tree.checksum()
 }
@@ -108,9 +123,10 @@ fun part3(data: String): Any {
 }
 
 fun Node.play() {
-//    return
+    return
     val synth = MidiSystem.getSynthesizer()
     synth.open()
+    Thread.sleep(160)
     val channel = synth.channels[0]
     flatten().forEach {
         println(it.data)
@@ -138,5 +154,6 @@ fun Node.play() {
         Thread.sleep(160)
         notes.forEach { (note, v) -> channel.noteOff(note) }
     }
+    Thread.sleep(160)
     synth.close()
 }
