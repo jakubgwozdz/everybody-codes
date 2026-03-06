@@ -52,59 +52,22 @@ data class Node(
         false to remaining
     }
 
-    fun tryStrong(branch: Node): Node? {
-        var b = branch
-        val l = left
-        if (l == null) {
-            if (branch.matchesStrongly(leftSocket)) {
-                left = b
-                return null
-            }
-        } else {
-            val remaining = l.tryStrong(b)
-            if (remaining != null) b = remaining
-            else return null
-        }
-        val r = right
-        if (r == null) {
-            if (branch.matchesStrongly(rightSocket)) {
-                right = b
-                return null
-            }
-        } else {
-            val remaining = r.tryStrong(b)
-            if (remaining != null) b = remaining
-            else return null
-        }
-        return b
+    fun tryCommon(branch: Node,
+                  tryOp: Node.(Node) -> Node?,
+                  testOp: Node.(Pair<String, String>) -> Boolean
+    ):Node? {
+        val (directLeft, bl) = tryConsume(branch, left, leftSocket, tryOp, testOp)
+        if (directLeft) left = branch
+        if (bl == null) return null
+        val (directRight, br) = tryConsume(bl, right, rightSocket, tryOp, testOp)
+        if (directRight) right = branch
+        return br
     }
 
-    fun tryWeak(branch: Node): Node? {
-        var b = branch
-        val l = left
-        if (l == null) {
-            if (branch.matchesWeakly(leftSocket)) {
-                left = b
-                return null
-            }
-        } else {
-            val remaining = l.tryWeak(b)
-            if (remaining != null) b = remaining
-            else return null
-        }
-        val r = right
-        if (r == null) {
-            if (branch.matchesWeakly(rightSocket)) {
-                right = b
-                return null
-            }
-        } else {
-            val remaining = r.tryWeak(b)
-            if (remaining != null) b = remaining
-            else return null
-        }
-        return b
-    }
+    fun tryStrong(branch: Node): Node? = tryCommon(branch, Node::tryStrong) { matchesStrongly(it) }
+
+    fun tryWeak(branch: Node): Node? = tryCommon(branch, Node::tryWeak) { matchesWeakly(it) }
+
 
     fun tryReplacingWeaker(branch: Node): Node? {
         var b = branch
