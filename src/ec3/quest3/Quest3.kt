@@ -41,55 +41,36 @@ data class Node(
     fun Node?.attemptConsumeOneSide(
         branch: Node,
         socket: Pair<String, String>,
-        tryOp: Node.(Node) -> Node?,
-        testOp: (Node?, Node, Pair<String, String>) -> Boolean,
+        testOp: Node?.(Node, Pair<String, String>) -> Boolean,
     ): Pair<Boolean, Node?> = when {
         testOp(this, branch, socket) -> true to this
-        this != null -> false to tryOp(branch)
+        this != null -> false to attemptConsume(branch, testOp)
         else -> false to branch
     }
 
-    fun attemptConsumeBothSides(
+    fun attemptConsume(
         branch: Node,
-        tryOp: Node.(Node) -> Node?,
-        testOp: (Node?, Node, Pair<String, String>) -> Boolean,
+        testOp: Node?.(Node, Pair<String, String>) -> Boolean,
     ): Node? {
-        val (directLeft, bl) = left.attemptConsumeOneSide(branch, leftSocket, tryOp, testOp)
+        val (directLeft, bl) = left.attemptConsumeOneSide(branch, leftSocket, testOp)
         if (directLeft) left = branch
         if (bl == null) return null
-        val (directRight, br) = right.attemptConsumeOneSide(bl, rightSocket, tryOp, testOp)
+        val (directRight, br) = right.attemptConsumeOneSide(bl, rightSocket, testOp)
         if (directRight) right = bl
         return br
     }
-
-    fun tryStrong(branch: Node): Node? =
-        attemptConsumeBothSides(branch, Node::tryStrong) { curr, candidate, socket ->
-            curr == null && candidate.matchesStrongly(socket)
-        }
-
-    fun tryWeak(branch: Node): Node? =
-        attemptConsumeBothSides(branch, Node::tryWeak) { curr, candidate, socket ->
-            curr == null && candidate.matchesWeakly(socket)
-        }
-
-
-    fun tryReplacingWeaker(branch: Node): Node? =
-        attemptConsumeBothSides(branch, Node::tryReplacingWeaker) { curr, candidate, socket ->
-            if (curr == null) candidate.matchesWeakly(socket)
-            else !curr.matchesStrongly(socket) && candidate.matchesStrongly(socket)
-        }
 
     fun flatten(): List<Node> = left?.flatten().orEmpty() + this + right?.flatten().orEmpty()
 
     fun checksum() = flatten().mapIndexed { index, node -> (index + 1) * node.id }.sum()
 }
 
-fun solve(data: String, op: Node.(Node) -> Node?): Any {
+fun solve(data: String, testOp: Node?.(Node, Pair<String, String>) -> Boolean): Any {
     val nodes = parse(data).toMutableList()
     val tree = nodes.removeFirst()
     while (nodes.isNotEmpty()) {
         val next = nodes.removeFirst()
-        tree.op(next)
+        tree.attemptConsume(next, testOp)
             ?.let { nodes.addFirst(it) }
     }
 //    tree.play()
@@ -97,11 +78,14 @@ fun solve(data: String, op: Node.(Node) -> Node?): Any {
 
 }
 
-fun part1(data: String) = solve(data, Node::tryStrong)
+fun part1(data: String) = solve(data) { candidate, socket -> this == null && candidate.matchesStrongly(socket) }
 
-fun part2(data: String) = solve(data, Node::tryWeak)
+fun part2(data: String) = solve(data) { candidate, socket -> this == null && candidate.matchesWeakly(socket) }
 
-fun part3(data: String) = solve(data, Node::tryReplacingWeaker)
+fun part3(data: String) = solve(data) { candidate, socket ->
+    if (this == null) candidate.matchesWeakly(socket)
+    else !this.matchesStrongly(socket) && candidate.matchesStrongly(socket)
+}
 
 fun Node.play() {
     val synth = MidiSystem.getSynthesizer()
