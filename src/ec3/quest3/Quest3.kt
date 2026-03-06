@@ -1,8 +1,5 @@
 package ec3.quest3
 
-import ec3.quest3.Node.AddResult.AcceptedDirectly
-import ec3.quest3.Node.AddResult.AcceptedIndirectly
-import ec3.quest3.Node.AddResult.DeniedOrReplaced
 import go
 import provideInput
 import yearAndQuestFromPackage
@@ -38,108 +35,108 @@ data class Node(
     var right: Node? = null,
 ) {
 
-    sealed interface AddResult {
-        object AcceptedDirectly : AddResult
-        object AcceptedIndirectly : AddResult
-        data class DeniedOrReplaced(val remaining: Node) : AddResult
-    }
-
     fun matchesStrongly(socket: Pair<String, String>) = plug == socket
     fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
 
-    fun tryStrong(branch: Node): AddResult {
+    fun tryConsume(
+        branch: Node,
+        current: Node?,
+        socket: Pair<String, String>,
+        tryOp: Node.(Node) -> Node?,
+        testOp: Node.(Pair<String, String>) -> Boolean
+    ): Pair<Boolean, Node?> = if (current == null) {
+        if (branch.testOp(socket)) true to null
+        else false to branch
+    } else {
+        val remaining = current.tryOp(branch)
+        false to remaining
+    }
+
+    fun tryStrong(branch: Node): Node? {
         var b = branch
         val l = left
         if (l == null) {
             if (branch.matchesStrongly(leftSocket)) {
                 left = b
-                return AcceptedDirectly
+                return null
             }
         } else {
             val remaining = l.tryStrong(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
         val r = right
         if (r == null) {
             if (branch.matchesStrongly(rightSocket)) {
                 right = b
-                return AcceptedDirectly
+                return null
             }
         } else {
             val remaining = r.tryStrong(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
-        return DeniedOrReplaced(b)
+        return b
     }
 
-    fun tryWeak(branch: Node): AddResult {
+    fun tryWeak(branch: Node): Node? {
         var b = branch
         val l = left
         if (l == null) {
             if (branch.matchesWeakly(leftSocket)) {
                 left = b
-                return AcceptedDirectly
+                return null
             }
         } else {
             val remaining = l.tryWeak(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
         val r = right
         if (r == null) {
             if (branch.matchesWeakly(rightSocket)) {
                 right = b
-                return AcceptedDirectly
+                return null
             }
         } else {
             val remaining = r.tryWeak(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
-        return DeniedOrReplaced(b)
+        return b
     }
 
-    fun tryWeak1(node: Node): AddResult = when {
-        left == null && node.matchesWeakly(leftSocket) -> AcceptedDirectly.also { left = node }
-        left?.tryWeak1(node) == AcceptedDirectly -> AcceptedDirectly
-        right == null && node.matchesWeakly(rightSocket) -> AcceptedDirectly.also { right = node }
-        right?.tryWeak1(node) == AcceptedDirectly -> AcceptedDirectly
-        else -> DeniedOrReplaced(node)
-    }
-
-    fun tryReplacingWeaker(branch: Node): AddResult {
+    fun tryReplacingWeaker(branch: Node): Node? {
         var b = branch
         val l = left
         if (l == null) {
             if (b.matchesWeakly(leftSocket)) {
                 left = b
-                return AcceptedDirectly
+                return null
             }
         } else if (!l.matchesStrongly(leftSocket) && b.matchesStrongly(leftSocket)) {
             left = b
             b = l
         } else {
             val remaining = l.tryReplacingWeaker(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
         val r = right
         if (r == null) {
             if (b.matchesWeakly(rightSocket)) {
                 right = b
-                return AcceptedDirectly
+                return null
             }
         } else if (!r.matchesStrongly(rightSocket) && b.matchesStrongly(rightSocket)) {
             right = b
             b = r
         } else {
             val remaining = r.tryReplacingWeaker(b)
-            if (remaining is DeniedOrReplaced) b = remaining.remaining
-            else return AcceptedIndirectly
+            if (remaining != null) b = remaining
+            else return null
         }
-        return DeniedOrReplaced(b)
+        return b
     }
 
     fun flatten(): List<Node> = left?.flatten().orEmpty() + this + right?.flatten().orEmpty()
@@ -147,13 +144,14 @@ data class Node(
     fun checksum() = flatten().mapIndexed { index, node -> (index + 1) * node.id }.sum()
 }
 
-fun solve(data: String, op: Node.(Node) -> Node.AddResult): Any {
+fun solve(data: String, op: Node.(Node) -> Node?): Any {
     val nodes = parse(data).toMutableList()
     val tree = nodes.removeFirst()
     while (nodes.isNotEmpty()) {
         val it = nodes.removeFirst()
         tree.op(it)
-            .also { if (it is DeniedOrReplaced) nodes.addFirst(it.remaining) }
+            ?.let { nodes.addFirst(it) }
+//            .also { if (it != null) nodes.addFirst(it) }
     }
 //    tree.play()
     return tree.checksum()
