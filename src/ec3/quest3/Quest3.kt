@@ -13,59 +13,79 @@ fun main() {
     go("part3", 396978) { part3(provideInput(year, quest, 3)) }
 }
 
+fun part1(data: String) = solve(data) { candidate, (type, content) ->
+    content == null && candidate.matchesStrongly(type)
+}
+
+fun part2(data: String) = solve(data) { candidate, (type, content) ->
+    content == null && candidate.matchesWeakly(type)
+}
+
+fun part3(data: String) = solve(data) { candidate, (type, content) ->
+    if (content == null) candidate.matchesWeakly(type)
+    else !content.matchesStrongly(type) && candidate.matchesStrongly(type)
+}
+
+
 fun parse(data: String): List<Node> = data.reader().readLines().map { line ->
     line.split(',').map { it.substringAfter('=') }.let { (id, plug, leftSocket, rightSocket, data) ->
         Node(
             id.toInt(),
             plug.split(' ').let { (c, s) -> Pair(c, s) },
-            leftSocket.split(' ').let { (c, s) -> Pair(c, s) },
-            rightSocket.split(' ').let { (c, s) -> Pair(c, s) },
+            Socket(leftSocket.split(' ').let { (c, s) -> Pair(c, s) }),
+            Socket(rightSocket.split(' ').let { (c, s) -> Pair(c, s) }),
             data
         )
     }
 }
 
+data class Socket(
+    val type: Pair<String, String>,
+    var content: Node? = null,
+)
+
 data class Node(
     val id: Int,
     val plug: Pair<String, String>,
-    val leftSocket: Pair<String, String>,
-    val rightSocket: Pair<String, String>,
+    val left: Socket,
+    val right: Socket,
     val data: String,
-    var left: Node? = null,
-    var right: Node? = null,
 ) {
 
-    fun matchesStrongly(socket: Pair<String, String>) = plug == socket
-    fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
+    fun matchesStrongly(socketType: Pair<String, String>) =
+        plug == socketType
 
-    fun Node?.attemptConsumeOneSide(
-        branch: Node,
-        socket: Pair<String, String>,
-        testOp: Node?.(Node, Pair<String, String>) -> Boolean,
-    ): Pair<Boolean, Node?> = when {
-        testOp(this, branch, socket) -> true to this
-        this != null -> false to attemptConsume(branch, testOp)
-        else -> false to branch
-    }
+    fun matchesWeakly(socketType: Pair<String, String>) =
+        plug.first == socketType.first || plug.second == socketType.second
 
     fun attemptConsume(
         branch: Node,
-        testOp: Node?.(Node, Pair<String, String>) -> Boolean,
+        testOp: (Node, Socket) -> Boolean,
     ): Node? {
-        val (directLeft, bl) = left.attemptConsumeOneSide(branch, leftSocket, testOp)
-        if (directLeft) left = branch
-        if (bl == null) return null
-        val (directRight, br) = right.attemptConsumeOneSide(bl, rightSocket, testOp)
-        if (directRight) right = bl
+        val (directLeft, bl) = attemptConsumeOneSide(branch, left, testOp)
+        if (directLeft) left.content = branch
+        val (directRight, br) = attemptConsumeOneSide(bl, right, testOp)
+        if (directRight) right.content = bl
         return br
     }
 
-    fun flatten(): List<Node> = left?.flatten().orEmpty() + this + right?.flatten().orEmpty()
+    fun flatten(): List<Node> = left.content?.flatten().orEmpty() + this + right.content?.flatten().orEmpty()
 
     fun checksum() = flatten().mapIndexed { index, node -> (index + 1) * node.id }.sum()
 }
 
-fun solve(data: String, testOp: Node?.(Node, Pair<String, String>) -> Boolean): Any {
+fun attemptConsumeOneSide(
+    branch: Node?,
+    socket: Socket,
+    testOp: (Node, Socket) -> Boolean,
+): Pair<Boolean, Node?> = when {
+    branch == null -> false to null
+    testOp(branch, socket) -> true to socket.content
+    socket.content != null -> false to socket.content!!.attemptConsume(branch, testOp)
+    else -> false to branch
+}
+
+fun solve(data: String, testOp: (Node, Socket) -> Boolean): Any {
     val nodes = parse(data).toMutableList()
     val tree = nodes.removeFirst()
     while (nodes.isNotEmpty()) {
@@ -76,15 +96,6 @@ fun solve(data: String, testOp: Node?.(Node, Pair<String, String>) -> Boolean): 
 //    tree.play()
     return tree.checksum()
 
-}
-
-fun part1(data: String) = solve(data) { candidate, socket -> this == null && candidate.matchesStrongly(socket) }
-
-fun part2(data: String) = solve(data) { candidate, socket -> this == null && candidate.matchesWeakly(socket) }
-
-fun part3(data: String) = solve(data) { candidate, socket ->
-    if (this == null) candidate.matchesWeakly(socket)
-    else !this.matchesStrongly(socket) && candidate.matchesStrongly(socket)
 }
 
 fun Node.play() {
