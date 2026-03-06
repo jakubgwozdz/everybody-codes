@@ -13,17 +13,17 @@ fun main() {
     go("part3", 396978) { part3(provideInput(year, quest, 3)) }
 }
 
-fun part1(data: String) = solve(data) { candidate, (type, content) ->
-    content == null && candidate.matchesStrongly(type)
+fun part1(data: String) = solve(data) { candidate, (socketType, content) ->
+    content == null && candidate.matchesStrongly(socketType)
 }
 
-fun part2(data: String) = solve(data) { candidate, (type, content) ->
-    content == null && candidate.matchesWeakly(type)
+fun part2(data: String) = solve(data) { candidate, (socketType, content) ->
+    content == null && candidate.matchesWeakly(socketType)
 }
 
-fun part3(data: String) = solve(data) { candidate, (type, content) ->
-    if (content == null) candidate.matchesWeakly(type)
-    else !content.matchesStrongly(type) && candidate.matchesStrongly(type)
+fun part3(data: String) = solve(data) { candidate, (socketType, content) ->
+    if (content == null) candidate.matchesWeakly(socketType)
+    else !content.matchesStrongly(socketType) && candidate.matchesStrongly(socketType)
 }
 
 
@@ -42,7 +42,14 @@ fun parse(data: String): List<Node> = data.reader().readLines().map { line ->
 data class Socket(
     val type: Pair<String, String>,
     var content: Node? = null,
-)
+) {
+    fun attemptConsumeOneSide(branch: Node, testOp: (Node, Socket) -> Boolean) = when {
+        testOp(branch, this) -> content.also { content = branch }
+        content != null -> content!!.attemptConsume(branch, testOp)
+        else -> branch
+    }
+
+}
 
 data class Node(
     val id: Int,
@@ -58,31 +65,12 @@ data class Node(
     fun matchesWeakly(socketType: Pair<String, String>) =
         plug.first == socketType.first || plug.second == socketType.second
 
-    fun attemptConsume(
-        branch: Node,
-        testOp: (Node, Socket) -> Boolean,
-    ): Node? {
-        val (directLeft, bl) = attemptConsumeOneSide(branch, left, testOp)
-        if (directLeft) left.content = branch
-        val (directRight, br) = attemptConsumeOneSide(bl, right, testOp)
-        if (directRight) right.content = bl
-        return br
-    }
+    fun attemptConsume(branch: Node, testOp: (Node, Socket) -> Boolean): Node? =
+        left.attemptConsumeOneSide(branch, testOp)?.let { right.attemptConsumeOneSide(it, testOp) }
 
     fun flatten(): List<Node> = left.content?.flatten().orEmpty() + this + right.content?.flatten().orEmpty()
 
     fun checksum() = flatten().mapIndexed { index, node -> (index + 1) * node.id }.sum()
-}
-
-fun attemptConsumeOneSide(
-    branch: Node?,
-    socket: Socket,
-    testOp: (Node, Socket) -> Boolean,
-): Pair<Boolean, Node?> = when {
-    branch == null -> false to null
-    testOp(branch, socket) -> true to socket.content
-    socket.content != null -> false to socket.content!!.attemptConsume(branch, testOp)
-    else -> false to branch
 }
 
 fun solve(data: String, testOp: (Node, Socket) -> Boolean): Any {
@@ -93,7 +81,7 @@ fun solve(data: String, testOp: (Node, Socket) -> Boolean): Any {
         tree.attemptConsume(next, testOp)
             ?.let { nodes.addFirst(it) }
     }
-//    tree.play()
+    tree.play()
     return tree.checksum()
 
 }
