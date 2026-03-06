@@ -38,69 +38,46 @@ data class Node(
     fun matchesStrongly(socket: Pair<String, String>) = plug == socket
     fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
 
-    fun tryConsume(
+    fun Node?.attemptConsumeOneSide(
         branch: Node,
-        current: Node?,
         socket: Pair<String, String>,
         tryOp: Node.(Node) -> Node?,
-        testOp: Node.(Pair<String, String>) -> Boolean
-    ): Pair<Boolean, Node?> = if (current == null) {
-        if (branch.testOp(socket)) true to null
-        else false to branch
-    } else {
-        val remaining = current.tryOp(branch)
-        false to remaining
+        testOp: (Node?, Node, Pair<String, String>) -> Boolean,
+    ): Pair<Boolean, Node?> = when {
+        testOp(this, branch, socket) -> true to this
+        this != null -> false to tryOp(branch)
+        else -> false to branch
     }
 
-    fun tryCommon(branch: Node,
-                  tryOp: Node.(Node) -> Node?,
-                  testOp: Node.(Pair<String, String>) -> Boolean
-    ):Node? {
-        val (directLeft, bl) = tryConsume(branch, left, leftSocket, tryOp, testOp)
+    fun attemptConsumeBothSides(
+        branch: Node,
+        tryOp: Node.(Node) -> Node?,
+        testOp: (Node?, Node, Pair<String, String>) -> Boolean,
+    ): Node? {
+        val (directLeft, bl) = left.attemptConsumeOneSide(branch, leftSocket, tryOp, testOp)
         if (directLeft) left = branch
         if (bl == null) return null
-        val (directRight, br) = tryConsume(bl, right, rightSocket, tryOp, testOp)
-        if (directRight) right = branch
+        val (directRight, br) = right.attemptConsumeOneSide(bl, rightSocket, tryOp, testOp)
+        if (directRight) right = bl
         return br
     }
 
-    fun tryStrong(branch: Node): Node? = tryCommon(branch, Node::tryStrong) { matchesStrongly(it) }
-
-    fun tryWeak(branch: Node): Node? = tryCommon(branch, Node::tryWeak) { matchesWeakly(it) }
-
-
-    fun tryReplacingWeaker(branch: Node): Node? {
-        var b = branch
-        val l = left
-        if (l == null) {
-            if (b.matchesWeakly(leftSocket)) {
-                left = b
-                return null
-            }
-        } else if (!l.matchesStrongly(leftSocket) && b.matchesStrongly(leftSocket)) {
-            left = b
-            b = l
-        } else {
-            val remaining = l.tryReplacingWeaker(b)
-            if (remaining != null) b = remaining
-            else return null
+    fun tryStrong(branch: Node): Node? =
+        attemptConsumeBothSides(branch, Node::tryStrong) { curr, candidate, socket ->
+            curr == null && candidate.matchesStrongly(socket)
         }
-        val r = right
-        if (r == null) {
-            if (b.matchesWeakly(rightSocket)) {
-                right = b
-                return null
-            }
-        } else if (!r.matchesStrongly(rightSocket) && b.matchesStrongly(rightSocket)) {
-            right = b
-            b = r
-        } else {
-            val remaining = r.tryReplacingWeaker(b)
-            if (remaining != null) b = remaining
-            else return null
+
+    fun tryWeak(branch: Node): Node? =
+        attemptConsumeBothSides(branch, Node::tryWeak) { curr, candidate, socket ->
+            curr == null && candidate.matchesWeakly(socket)
         }
-        return b
-    }
+
+
+    fun tryReplacingWeaker(branch: Node): Node? =
+        attemptConsumeBothSides(branch, Node::tryReplacingWeaker) { curr, candidate, socket ->
+            if (curr == null) candidate.matchesWeakly(socket)
+            else !curr.matchesStrongly(socket) && candidate.matchesStrongly(socket)
+        }
 
     fun flatten(): List<Node> = left?.flatten().orEmpty() + this + right?.flatten().orEmpty()
 
@@ -111,10 +88,9 @@ fun solve(data: String, op: Node.(Node) -> Node?): Any {
     val nodes = parse(data).toMutableList()
     val tree = nodes.removeFirst()
     while (nodes.isNotEmpty()) {
-        val it = nodes.removeFirst()
-        tree.op(it)
+        val next = nodes.removeFirst()
+        tree.op(next)
             ?.let { nodes.addFirst(it) }
-//            .also { if (it != null) nodes.addFirst(it) }
     }
 //    tree.play()
     return tree.checksum()
