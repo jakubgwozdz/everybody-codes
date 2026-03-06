@@ -3,21 +3,13 @@ package ec3.quest3
 import go
 import provideInput
 import yearAndQuestFromPackage
+import javax.sound.midi.MidiSystem
 
 
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1", 5371) { part1(provideInput(year, quest, 1)) }
     go("part2", 319081) { part2(provideInput(year, quest, 2)) }
-    val ex2 = """
-        id=1, plug=RED TRIANGLE, leftSocket=BLUE TRIANGLE, rightSocket=GREEN TRIANGLE, data=?
-        id=2, plug=GREEN TRIANGLE, leftSocket=BLUE CIRCLE, rightSocket=GREEN CIRCLE, data=?
-        id=3, plug=BLUE PENTAGON, leftSocket=BLUE CIRCLE, rightSocket=GREEN CIRCLE, data=?
-        id=4, plug=RED TRIANGLE, leftSocket=BLUE PENTAGON, rightSocket=GREEN PENTAGON, data=?
-        id=5, plug=BLUE TRIANGLE, leftSocket=GREEN CIRCLE, rightSocket=RED CIRCLE, data=?
-        id=6, plug=BLUE TRIANGLE, leftSocket=GREEN CIRCLE, rightSocket=RED CIRCLE, data=?
-    """.trimIndent()
-    go("part3ex", 60) { part3(ex2) }
     go("part3", 396978) { part3(provideInput(year, quest, 3)) }
 }
 
@@ -87,7 +79,7 @@ data class Tree(
             val t = right!!
             right = b
             b = t
-        }else if (right != null) b = right?.addReplacing(b) ?: return null
+        } else if (right != null) b = right?.addReplacing(b) ?: return null
         return b
     }
 
@@ -100,6 +92,7 @@ fun part1(data: String): Any {
     val nodes = parse(data)
     val tree = Tree(nodes.first())
     nodes.drop(1).forEach { tree.addRequireStrong(it) }
+    tree.play()
     return tree.checksum()
 }
 
@@ -107,6 +100,7 @@ fun part2(data: String): Any {
     val nodes = parse(data)
     val tree = Tree(nodes.first())
     nodes.drop(1).forEach { tree.addAllowingWeak(it) }
+    tree.play()
     return tree.checksum()
 }
 
@@ -117,5 +111,39 @@ fun part3(data: String): Any {
         val it = nodes.removeFirst()
         tree.addReplacing(it)?.let { nodes.addFirst(it) }
     }
+    tree.play()
     return tree.checksum()
+}
+
+fun Tree.play() {
+    val synth = MidiSystem.getSynthesizer()
+    synth.open()
+    val channel = synth.channels[0]
+    flatten().forEach {
+        println(it.data)
+        val notes = it.data.mapIndexed { index, ch ->
+            val note = 48 + (index / 7) * 12 + when (index % 7) {
+                0 -> 0
+                1 -> 2
+                2 -> 4
+                3 -> 5
+                4 -> 7
+                5 -> 9
+                6 -> 11
+                else -> error("Unreachable")
+            }
+            val velocity = when (ch) {
+                '1'->80
+                '2'->100
+                '3'->120
+                '-'->0
+                else -> error("Unreachable")
+            }
+            note to velocity
+        }.filter { (note, v) -> v > 0 }
+        notes.forEach { (note, v) -> channel.noteOn(note, v) }
+        Thread.sleep(160)
+        notes.forEach { (note, v) -> channel.noteOff(note) }
+    }
+    synth.close()
 }
