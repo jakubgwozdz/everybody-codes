@@ -13,32 +13,31 @@ fun main() {
     go("part3", 396978) { part3(provideInput(year, quest, 3)) }
 }
 
-typealias Plug = Pair<String, String>
-
-data class Node(
-    val id: Int,
-    val plug: Plug,
-    val leftSocket: Plug,
-    val rightSocket: Plug,
-    val data: String,
-) {
-    fun matchesWeakly(socket: Plug) = plug.first == socket.first || plug.second == socket.second
-}
-
 fun parse(data: String): List<Node> = data.reader().readLines().map { line ->
     line.split(',').map { it.substringAfter('=') }.let { (id, plug, leftSocket, rightSocket, data) ->
         Node(
             id.toInt(),
-            plug.split(' ').let { (c, s) -> Plug(c, s) },
-            leftSocket.split(' ').let { (c, s) -> Plug(c, s) },
-            rightSocket.split(' ').let { (c, s) -> Plug(c, s) },
+            plug.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
+            leftSocket.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
+            rightSocket.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
             data
         )
     }
 }
 
+data class Node(
+    val id: Int,
+    val plug: Pair<String, String>,
+    val leftSocket: Pair<String, String>,
+    val rightSocket: Pair<String, String>,
+    val data: String,
+) {
+    fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
+}
+
+
 data class Tree(
-    var current: Node,
+    val current: Node,
     var left: Tree? = null,
     var right: Tree? = null,
 ) {
@@ -50,7 +49,7 @@ data class Tree(
         else -> false
     }
 
-    fun matchesWeakly(socket: Plug) = current.plug.first == socket.first || current.plug.second == socket.second
+    fun matchesWeakly(socket: Pair<String, String>) = current.plug.first == socket.first || current.plug.second == socket.second
 
     fun addAllowingWeak(node: Node): Boolean = when {
         left == null && node.matchesWeakly(current.leftSocket) -> true.also { left = Tree(node) }
@@ -133,10 +132,10 @@ fun Tree.play() {
                 else -> error("Unreachable")
             }
             val velocity = when (ch) {
-                '1'->80
-                '2'->100
-                '3'->120
-                '-'->0
+                '1' -> 80
+                '2' -> 100
+                '3' -> 120
+                '-' -> 0
                 else -> error("Unreachable")
             }
             note to velocity
