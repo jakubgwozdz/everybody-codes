@@ -17,9 +17,9 @@ fun parse(data: String): List<Node> = data.reader().readLines().map { line ->
     line.split(',').map { it.substringAfter('=') }.let { (id, plug, leftSocket, rightSocket, data) ->
         Node(
             id.toInt(),
-            plug.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
-            leftSocket.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
-            rightSocket.split(' ').let { (c, s) -> Pair<String, String>(c, s) },
+            plug.split(' ').let { (c, s) -> Pair(c, s) },
+            leftSocket.split(' ').let { (c, s) -> Pair(c, s) },
+            rightSocket.split(' ').let { (c, s) -> Pair(c, s) },
             data
         )
     }
@@ -31,50 +31,43 @@ data class Node(
     val leftSocket: Pair<String, String>,
     val rightSocket: Pair<String, String>,
     val data: String,
+    var left: Node? = null,
+    var right: Node? = null,
 ) {
     fun matchesWeakly(socket: Pair<String, String>) = plug.first == socket.first || plug.second == socket.second
-}
 
-
-data class Tree(
-    val current: Node,
-    var left: Tree? = null,
-    var right: Tree? = null,
-) {
     fun addRequireStrong(node: Node): Boolean = when {
-        left == null && node.plug == current.leftSocket -> true.also { left = Tree(node) }
+        left == null && node.plug == leftSocket -> true.also { left = node }
         left?.addRequireStrong(node) == true -> true
-        right == null && node.plug == current.rightSocket -> true.also { right = Tree(node) }
+        right == null && node.plug == rightSocket -> true.also { right = node }
         right?.addRequireStrong(node) == true -> true
         else -> false
     }
 
-    fun matchesWeakly(socket: Pair<String, String>) = current.plug.first == socket.first || current.plug.second == socket.second
-
     fun addAllowingWeak(node: Node): Boolean = when {
-        left == null && node.matchesWeakly(current.leftSocket) -> true.also { left = Tree(node) }
+        left == null && node.matchesWeakly(leftSocket) -> true.also { left = node }
         left?.addAllowingWeak(node) == true -> true
-        right == null && node.matchesWeakly(current.rightSocket) -> true.also { right = Tree(node) }
+        right == null && node.matchesWeakly(rightSocket) -> true.also { right = node }
         right?.addAllowingWeak(node) == true -> true
         else -> false
     }
 
-    fun addReplacing(branch: Tree): Tree? {
+    fun addReplacing(branch: Node): Node? {
         var b = branch
-        if (left == null && b.current.matchesWeakly(current.leftSocket)) {
+        if (left == null && b.matchesWeakly(leftSocket)) {
             left = b
             return null
         }
-        if (left != null && left?.current?.plug != current.leftSocket && b.current.plug == current.leftSocket) {
+        if (left != null && left?.plug != leftSocket && b.plug == leftSocket) {
             val t = left!!
             left = b
             b = t
         } else if (left != null) b = left?.addReplacing(b) ?: return null
-        if (right == null && b.current.matchesWeakly(current.rightSocket)) {
+        if (right == null && b.matchesWeakly(rightSocket)) {
             right = b
             return null
         }
-        if (right != null && right?.current?.plug != current.rightSocket && b.current.plug == current.rightSocket) {
+        if (right != null && right?.plug != rightSocket && b.plug == rightSocket) {
             val t = right!!
             right = b
             b = t
@@ -82,14 +75,14 @@ data class Tree(
         return b
     }
 
-    fun flatten(): List<Node> = left?.flatten().orEmpty() + current + right?.flatten().orEmpty()
+    fun flatten(): List<Node> = left?.flatten().orEmpty() + this + right?.flatten().orEmpty()
 
     fun checksum() = flatten().mapIndexed { index, node -> (index + 1) * node.id }.sum()
 }
 
 fun part1(data: String): Any {
     val nodes = parse(data)
-    val tree = Tree(nodes.first())
+    val tree = nodes.first()
     nodes.drop(1).forEach { tree.addRequireStrong(it) }
     tree.play()
     return tree.checksum()
@@ -97,14 +90,14 @@ fun part1(data: String): Any {
 
 fun part2(data: String): Any {
     val nodes = parse(data)
-    val tree = Tree(nodes.first())
+    val tree = nodes.first()
     nodes.drop(1).forEach { tree.addAllowingWeak(it) }
     tree.play()
     return tree.checksum()
 }
 
 fun part3(data: String): Any {
-    val nodes = parse(data).map { Tree(it) }.toMutableList()
+    val nodes = parse(data).toMutableList()
     val tree = nodes.removeFirst()
     while (nodes.isNotEmpty()) {
         val it = nodes.removeFirst()
@@ -114,7 +107,8 @@ fun part3(data: String): Any {
     return tree.checksum()
 }
 
-fun Tree.play() {
+fun Node.play() {
+//    return
     val synth = MidiSystem.getSynthesizer()
     synth.open()
     val channel = synth.channels[0]
