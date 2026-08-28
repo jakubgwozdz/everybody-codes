@@ -22,24 +22,11 @@ fun main() {
 
 fun List<Int>.matches(which: Int, where: Int): Boolean = (where - this[which % this.size]) % 2 == 0
 
-fun part1(data: String): Any {
-    val parsed = data.reader().readLines().associate { it.substringBefore("=") to it.substringAfter("=") }
-    val ho = parsed["horizontal-offsets"]!!.map { it.digitToInt() }
-    val vo = parsed["vertical-offsets"]!!.map { it.digitToInt() }
-    val width = parsed["width"]!!.toInt()
-    val height = parsed["height"]!!.toInt()
-    return (0..<height).sumOf { r ->
-        (0..<width).count { c ->
-            val top = ho.matches(r, c)
-            val bottom = ho.matches(r + 1, c)
-            val left = vo.matches(c, r)
-            val right = vo.matches(c + 1, r)
-            top && bottom && left && right
-        }
-    }
-}
+fun part1(data: String): Any = calculateOddAndEven(data).let { (odd, even) -> odd + even }
+fun part2(data: String): Any = calculateOddAndEven(data).let { (odd, even) -> maxOf(odd, even) }
+fun part3(data: String): Any = calculateOddAndEven(data).let { (odd, even) -> maxOf(odd, even) }
 
-fun part2(data: String): Any {
+private fun calculateOddAndEven(data: String): Pair<Long, Long> {
     val parsed = data.reader().readLines().associate { it.substringBefore("=") to it.substringAfter("=") }
     val ho = parsed["horizontal-offsets"]!!.map { it.digitToInt() }
     val vo = parsed["vertical-offsets"]!!.map { it.digitToInt() }
@@ -68,36 +55,38 @@ fun part2(data: String): Any {
             r += repetitions * round1
         }
         if (r > 0 && ho.matches(r, 0)) firstOdd = !firstOdd
-        var nextOdd = firstOdd
-        var c = 0
-        var oddSnapshotCol = 0L
-        var evenSnapshotCol = 0L
-        while (c < width) {
-            if (c == 1) {
-                oddSnapshotCol = odd
-                evenSnapshotCol = even
+
+        if (ho.matches(r, 0) == ho.matches(r + 1, 0)) {
+
+            var nextOdd = firstOdd
+            var c = 0
+            var oddSnapshotCol = 0L
+            var evenSnapshotCol = 0L
+            while (c < width) {
+                if (c == 1) {
+                    oddSnapshotCol = odd
+                    evenSnapshotCol = even
+                }
+                val round2 = vo.size * 2
+                if (c == 1 + round2) {
+                    val repetitions = (width - c) / round2
+                    odd += (odd - oddSnapshotCol) * repetitions
+                    even += (even - evenSnapshotCol) * repetitions
+                    c += repetitions * round2
+                }
+                val top = ho.matches(r, c)
+                val bottom = ho.matches(r + 1, c)
+                val left = vo.matches(c, r)
+                val right = vo.matches(c + 1, r)
+                if (c > 0 && left) nextOdd = !nextOdd
+                val isolated = top && bottom && left && right
+                if (isolated) {
+                    if (nextOdd) odd++ else even++
+                }
+                c++
             }
-            val round2 = vo.size * 2
-            if (c == 1 + round2) {
-                val repetitions = (width - c) / round2
-                odd += (odd - oddSnapshotCol) * repetitions
-                even += (even - evenSnapshotCol) * repetitions
-                c += repetitions * round2
-            }
-            val top = ho.matches(r, c)
-            val bottom = ho.matches(r + 1, c)
-            val left = vo.matches(c, r)
-            val right = vo.matches(c + 1, r)
-            if (c > 0 && left) nextOdd = !nextOdd
-            val isolated = top && bottom && left && right
-            if (isolated) {
-                if (nextOdd) odd++ else even++
-            }
-            c++
         }
         r++
     }
-    return maxOf(odd, even)
+    return odd to even
 }
-
-fun part3(data: String) = part2(data)
