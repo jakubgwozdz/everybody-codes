@@ -3,7 +3,6 @@ package ec2026.quest3
 import go
 import provideInput
 import yearAndQuestFromPackage
-import java.math.BigInteger
 
 private val ex1 = """
     ISO-3210 7654
@@ -32,34 +31,41 @@ fun main() {
 
 fun iso1(data: String) = data.lines().sumOf { line ->
     val (standard, encoded) = parse(line)
-    standard.decode(encoded)
+    val key = calculateKey(standard, encoded.length)
+    decode(key, encoded)
 }
 
 fun iso2(data: String) = data.lines().sumOf { line ->
     val (standard, encoded) = parse(line)
-    standard.decode(encoded).takeIf {
-        encoded == standard.encode(it, encoded.length)!!.dropWhile { it == '0' }
+    val key = calculateKey(standard, encoded.length)
+    decode(key, encoded).takeIf {
+        encode(key, it, encoded.length)!!.dropWhile { it == '0' } == encoded
     } ?: 0
 }
 
+private fun calculateKey(standard: List<Int>, length: Int): List<Pair<Long, Long>> = buildList {
+    (0..length).forEach { i ->
+        val coeff = standard[standard.size - 1 - (i % standard.size)].toBigInteger().pow(i).toLong()
+        val maxSoFar = lastOrNull()?.let { (c, m) -> c * 9 + m } ?: 0
+        add(coeff to maxSoFar)
+    }
+}
+
 private fun parse(line: String) =
-    line.substringBefore(' ').substringAfter('-').map { it.digitToInt().toBigInteger() } to
+    line.substringBefore(' ').substringAfter('-').map { it.digitToInt() } to
             line.substringAfter(' ')
 
-private fun List<BigInteger>.decode(encoded: String) =
-    encoded.indices.sumOf { i -> nth(i) * encoded[encoded.length - 1 - i].digitToInt() }
+private fun decode(key: List<Pair<Long, Long>>, encoded: String) =
+    encoded.indices.sumOf { i -> key[i].first * encoded[encoded.length - 1 - i].digitToInt() }
 
-private fun List<BigInteger>.nth(i: Int) = this[size - 1 - (i % size)].pow(i).toLong()
-
-private fun List<BigInteger>.encode(value: Long, i: Int): String? {
-    val n = nth(i)
-    val maxDoable = (0..<i).sumOf { nth(it) } * 9
-    val max = (value / n).coerceIn(0L..9)
-    val min = ((value - maxDoable) / n).coerceIn(0L..9)
+private fun encode(key: List<Pair<Long, Long>>, value: Long, i: Int): String? {
+    val (coeff, maxSmaller) = key[i]
+    val min = ((value - maxSmaller) / coeff).coerceIn(0L..9)
+    val max = (value / coeff).coerceIn(0L..9)
     return (min..max).firstNotNullOfOrNull { d ->
         when {
-            i > 0 -> encode(value - d * n, i - 1)?.let { "$d$it" }
-            value == d * n -> "$d"
+            i > 0 -> encode(key, value - d * coeff, i - 1)?.let { "$d$it" }
+            value == d * coeff -> "$d"
             else -> null
         }
     }
