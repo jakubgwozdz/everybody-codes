@@ -30,43 +30,44 @@ fun main() {
 }
 
 fun iso1(data: String) = data.lines().sumOf { line ->
-    val (standard, encoded) = parse(line)
-    val key = calculateKey(standard, encoded.length)
-    decode(key, encoded)
+    val (_, standard, encoded) = line.split(' ', '-')
+    val key = Key(standard, encoded.length)
+    key.decode(encoded)
 }
 
 fun iso2(data: String) = data.lines().sumOf { line ->
-    val (standard, encoded) = parse(line)
-    val key = calculateKey(standard, encoded.length)
-    decode(key, encoded).takeIf {
-        encode(key, it, encoded.length)!!.dropWhile { it == '0' } == encoded
-    } ?: 0
+    val (_, standard, encoded) = line.split(' ', '-')
+    val key = Key(standard, encoded.length)
+    key.decode(encoded).takeIf { key.encode(it) == encoded } ?: 0
 }
 
-private fun calculateKey(standard: List<Int>, length: Int): List<Pair<Long, Long>> = buildList {
-    (0..length).forEach { i ->
-        val coeff = standard[standard.size - 1 - (i % standard.size)].toBigInteger().pow(i).toLong()
-        val maxSoFar = lastOrNull()?.let { (c, m) -> c * 9 + m } ?: 0
-        add(coeff to maxSoFar)
+class Key(standard: String, val length: Int) {
+
+    // reversed
+    val coeffs = (0..length).map { i ->
+        standard[standard.length - 1 - (i % standard.length)].digitToInt().pow(i)
     }
-}
 
-private fun parse(line: String) =
-    line.substringBefore(' ').substringAfter('-').map { it.digitToInt() } to
-            line.substringAfter(' ')
+    fun decode(encoded: String) =
+        encoded.indices.sumOf { i -> coeffs[i] * encoded[encoded.length - 1 - i].digitToInt() }
 
-private fun decode(key: List<Pair<Long, Long>>, encoded: String) =
-    encoded.indices.sumOf { i -> key[i].first * encoded[encoded.length - 1 - i].digitToInt() }
+    fun encode(value: Long) = encode(value, length)?.dropWhile { it == '0' }
 
-private fun encode(key: List<Pair<Long, Long>>, value: Long, i: Int): String? {
-    val (coeff, maxSmaller) = key[i]
-    val min = ((value - maxSmaller) / coeff).coerceIn(0L..9)
-    val max = (value / coeff).coerceIn(0L..9)
-    return (min..max).firstNotNullOfOrNull { d ->
-        when {
-            i > 0 -> encode(key, value - d * coeff, i - 1)?.let { "$d$it" }
-            value == d * coeff -> "$d"
-            else -> null
+    // cache for faster encoding
+    private val maxWithout: List<Long> = (1..length).runningFold(0L) { acc, i -> acc + coeffs[i - 1] * 9 }
+
+    private fun encode(value: Long, i: Int): String? {
+        val coeff = coeffs[i]
+        val min = ((value - maxWithout[i]) / coeff).coerceIn(0L..9)
+        val max = (value / coeff).coerceIn(0L..9)
+        return (min..max).firstNotNullOfOrNull { d ->
+            when {
+                i > 0 -> encode(value - d * coeff, i - 1)?.let { "$d$it" }
+                value == d * coeff -> "$d"
+                else -> null
+            }
         }
     }
 }
+
+private fun Int.pow(e: Int) = toBigInteger().pow(e).toLong()
