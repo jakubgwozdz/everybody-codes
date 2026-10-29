@@ -1,4 +1,4 @@
-package ec2025
+package ec2026
 
 import go
 import provideInput
