@@ -56,6 +56,7 @@ fun <S> display(
     title: String,
     dimension: Dimension = Dimension(600, 580),
     location: Point = Point(500, 300),
+    refreshDelay: Int = 10,
     op: (S, BufferedImage) -> Unit
 ) {
     val image = BufferedImage(
@@ -67,7 +68,7 @@ fun <S> display(
         init {
             preferredSize = dimension
             size = preferredSize
-            timer = Timer(10) {
+            timer = Timer(refreshDelay) {
                 op(state.load(), image)
                 repaint()
             }

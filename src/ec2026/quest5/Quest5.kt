@@ -47,7 +47,7 @@ fun Pos.treeNeighbour() = sequenceOf(
 //    ne(), se(), nw(), sw()
 )
 
-private fun is1(map: List<String>, p: Pos) = map.getOrNull(p.first)?.getOrNull(p.second) == '1'
+fun is1(map: List<String>, p: Pos) = map.getOrNull(p.first)?.getOrNull(p.second) == '1'
 
 fun part1(data: String) = findLand(data.lines()).size
 
@@ -55,30 +55,29 @@ fun part2(data: String) = findBeach(findLand(data.lines())).size
 
 fun part3(data: String): Any {
     val map = data.lines()
-    draw(map)
+//    draw(map)
     val land = findLand(map)
-    draw(map, land)
+//    draw(map, land)
     val beach = findBeach(land)
-    draw(map, land, beach)
+//    draw(map, land, beach)
     val trees = findForest(land - beach).toMutableSet()
-    draw(map, land, beach, trees)
+//    draw(map, land, beach, trees)
     repeat(2) {
         trees += growForest(trees, beach)
-        draw(map, land, beach)
+//        draw(map, land, beach)
     }
     return trees.size
 }
 
-private fun growForest(
+internal fun growForest(
     trees: Set<Pos>,
     beach: Set<Pos>,
 ) = buildSet { trees.forEach { addAll(it.adjacent()) } }
     .filter { l -> l.adjacent().none { it in beach } && l.adjacent().count { it in trees } >= 4 }
 
-private fun findForest(grass: Set<Pos>) = grass.filter { l -> l.treeNeighbour().all { it in grass } }.toSet()
+internal fun findForest(grass: Set<Pos>) = grass.filter { l -> l.treeNeighbour().all { it in grass } }.toSet()
 
-private fun findLand(map: List<String>): Set<Pos> {
-    val center: Pos = (map.size / 2 + 1) to (map.first().length / 2 + 1)
+internal fun findLand(map: List<String>, center: Pos = findCenter(map)): Set<Pos> {
     val queue = mutableListOf(center)
     val land = mutableSetOf<Pos>()
     while (queue.isNotEmpty()) {
@@ -90,8 +89,9 @@ private fun findLand(map: List<String>): Set<Pos> {
     return land.toSet()
 }
 
+internal fun findCenter(map: List<String>): Pair<Int, Int> = (map.size / 2 + 1) to (map.first().length / 2 + 1)
 
-private fun findBeach(land: Set<Pos>): Set<Pos> {
+internal fun findBeach(land: Set<Pos>): Set<Pos> {
     val queue = land.filter { it.adjacent().any { n -> n !in land } }.toMutableList()
     val beach = queue.toMutableSet()
     while (queue.isNotEmpty()) {
@@ -108,12 +108,12 @@ private fun draw(
     map: List<String>,
     land: Set<Pos> = emptySet(),
     beach: Set<Pos> = emptySet(),
-    trees: Set<Pos> = emptySet(),
+    forest: Set<Pos> = emptySet(),
 ) = map.forEachIndexed { r, line ->
     line.indices.forEach { c ->
         val pos = r to c
         val ch = when {
-            pos in trees -> '@'
+            pos in forest -> '@'
             pos in beach -> '='
             pos in land -> '#'
             map[pos] == '1' -> '^'
