@@ -7,9 +7,11 @@ import coords.pair.row
 import display
 import provideInput
 import useGraphics
+import withAlpha
 import yearAndQuestFromPackage
 import java.awt.Color
 import java.awt.Point
+import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.lang.Thread.sleep
 import javax.swing.Timer
@@ -17,7 +19,6 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
 import kotlin.math.roundToInt
-import kotlin.random.Random
 
 data class AnimState(
     val center: Pos,
@@ -63,40 +64,54 @@ class Quest5Video {
         else -> Tile.Sea
     }
 
+    private val charsBelow = 15.0
+    private val rectsFrom = 65.0
+
     fun paintOnImage(state: AnimState, image: BufferedImage) = image.useGraphics { g ->
         g.color = bgColor
         g.fillRect(0, 0, image.width, image.height)
-        g.color = fgColor
-        val scale = 1 / state.size
         val half = minOf(image.width, image.height) / 2.0
-        val cell = half * scale
-        g.font = g.font.deriveFont(cell.toFloat())
-        val fm = g.fontMetrics
-        val xCharOffset = - fm.charWidth('#') / 2.0f
-        val yCharOffset = (fm.ascent - fm.descent) / 2.0f
+        val cellW = half / state.size
+        val cellH = cellW * state.center.col / state.center.row
+
+        val fm = g.getFontMetrics(g.font.deriveFont(cellW.toFloat()))
+        val xCharOffset = -fm.charWidth('#') / 2.0 / cellW
+        val yCharOffset = (fm.ascent - fm.descent) / 2.0 / cellH
+
+        val drawRects = state.size >= charsBelow
+        val drawChars = state.size < rectsFrom
+        val alpha = (((state.size - charsBelow) / (rectsFrom - charsBelow)).coerceIn(0.0, 1.0) * 255).toInt()
+
+        val saved = g.transform
+        g.translate(image.width / 2.0, image.height / 2.0)
+        g.scale(cellW, cellH)
+        g.translate(-(state.center.col + 0.5), -(state.center.row + 0.5))
+        g.font = g.font.deriveFont(1f)
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF)
 
         val (rows, cols) = clipped(state)
         rows.forEach { r ->
             cols.forEach { c ->
-                val p = Pos(r, c)
-                val tile = state[p]
-
-                val cx = image.width / 2.0 +
-                        (c - state.center.col+ Random.nextDouble(-0.1, 0.1)) * cell
-                val cy = image.height / 2.0 +
-                        (r - state.center.row+ Random.nextDouble(-0.1, 0.1)) * cell * state.center.col / state.center.row
-
-                g.color = tile.color
-                g.translate(cx, cy)
-                g.drawString(tile.ch.toString(), xCharOffset, yCharOffset)
-                g.translate(-cx, -cy)
+                val tile = state[Pos(r, c)]
+                if (drawRects) {
+                    g.color = if (drawChars) tile.color.withAlpha(alpha) else tile.color
+                    g.fillRect(c, r, 1, 1)
+                }
+                if (drawChars) {
+                    g.color = tile.color
+                    g.drawString(
+                        tile.ch.toString(),
+                        (c + 0.5 + xCharOffset).toFloat(),
+                        (r + 0.5 + yCharOffset).toFloat()
+                    )
+                }
             }
         }
-
+        g.transform = saved
     }
 
     private fun clipped(state: AnimState): Pair<IntRange, IntRange> {
-        val interesting = state.size.roundToInt() + 1
+        val interesting = state.size.roundToInt() + 3
         val rows = state.center.first - interesting..state.center.first + interesting
         val cols = state.center.second - interesting..state.center.second + interesting
         return rows to cols
@@ -116,15 +131,15 @@ fun part5video(data: String) {
         refreshDelay = 33,
         op = video::paintOnImage
     )
-    val zoomTimer = Timer(10) { animState.update { it.copy(size = it.size + 0.08) } }.apply { start() }
+//    val zoomTimer = Timer(10) { animState.update { it.copy(size = it.size + 0.08) } }.apply { start() }
     sleep(1000)
 
     val runTimer = Timer(160) {
+        val land = animState.load().let { it.land + findLandDelta(map, it.land) }
+        val beach = findBeach(land)
+        val forest = findForest(land - beach).toMutableSet()
+        repeat(2) { forest += growForest(forest, beach) }
         animState.update {
-            val land = it.land + findLandDelta(map, it.land)
-            val beach = findBeach(land)
-            val forest = findForest(land - beach).toMutableSet()
-            repeat(2) { forest += growForest(forest, beach) }
             it.copy(land = land, beach = beach, forest = forest)
         }
     }.apply { start() }
