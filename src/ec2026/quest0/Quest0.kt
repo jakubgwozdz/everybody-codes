@@ -1,4 +1,4 @@
-package ec2026
+package ec2026.quest0
 
 import go
 import provideInput
