@@ -32,73 +32,80 @@ fun main() {
     go("part2 ex", 1316) { part2(exampleA) }
     go("part2 ex2", 1214633) { part2(exampleB) }
     go("part2", 170660670) { part2(provideInput(year, quest, 2)) }
-    go("part3 ex", 187) { part3(exampleB, 100) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3 ex", 187) { part3(exampleA, 100) }
+    go("part3", 36015318) { part3(provideInput(year, quest, 3)) }
 }
 
-data class Cloud(var energy: Long, val connections: List<Int>, var isAlive: Boolean = true)
+data class Cloud(var energy: Long, val connections: List<String>, var isAlive: Boolean = true)
 
 fun part1(data: String): Long {
-    val firstCharge = 5
     val clouds = parse(data)
     val firstCloud = clouds.maxBy { (_, v) -> v.connections.size }.key
-    return calculate(clouds, firstCloud, firstCharge, null)
+    return calculate(clouds, firstCloud, 5L, null)
 }
 
 fun part2(data: String): Long {
-    val firstCharge = 10
     val clouds = parse(data)
     val firstCloud = clouds.maxBy { (_, v) -> v.connections.size }.key
-    return calculate(clouds, firstCloud, firstCharge, null)
+    return calculate(clouds, firstCloud, 10L, null)
 }
 
 fun part3(data: String, limit: Long = 1000000): Any {
-    val firstCharge = 10
     val clouds = parse(data)
-    val firstCloud = clouds.maxBy { (_, v) -> v.connections.size }.key
-    return calculate(clouds, firstCloud, firstCharge, limit)
+    return clouds.keys.maxOf { calculate(clouds, it, 10L, limit) }
 }
 
 private fun calculate(
-    clouds: Map<Int, Cloud>,
-    firstCloud: Int,
-    firstCharge: Int,
+    clouds: Map<String, Cloud>,
+    firstCloud: String,
+    firstCharge: Long,
     limit: Long?
-): Long = clouds.mapValues { it.value.copy() }
+): Long = clouds
+    .mapValues { it.value.copy() } // deep copy to work on mutable values
     .apply { propagate(firstCloud, firstCharge, limit) }
-    .values.filter { it.isAlive }.sumOf { it.energy }
+    .values.sumOf { it.energy }
 
-private fun Map<Int, Cloud>.propagate(
-    firstCloud: Int,
-    firstCharge: Int,
+private fun Map<String, Cloud>.propagate(
+    firstCloud: String,
+    firstCharge: Long,
     limit: Long?,
 ) {
-    var receivers = mapOf(firstCloud to 1L)
-    (firstCharge downTo 1).forEach { charge ->
-        receivers = buildMap {
-            receivers.forEach { (id, count) ->
-                val cloud = this@propagate[id]!!
-                if (cloud.isAlive) {
-                    cloud.energy += charge * count
-                    cloud.connections.forEach { n ->
-                        if (this@propagate[id]!!.isAlive) increment(n, count)
-                    }
-                }
-            }
-        }
-        if (limit != null) forEach { (i, cloud) ->
-            if (cloud.isAlive && cloud.energy >= limit) {
-                cloud.isAlive = false
+    var receivers = mapOf((firstCloud to firstCharge) to 1L)
+    while (receivers.isNotEmpty()) { receivers = oneStep(receivers, limit) }
+}
+
+private fun Map<String, Cloud>.oneStep(
+    receivers: Map<Pair<String, Long>, Long>,
+    limit: Long?
+): Map<Pair<String, Long>, Long> {
+    val newReceivers = mutableMapOf<Pair<String, Long>, Long>()
+    receivers.forEach { (idWithCharge, count) ->
+        val (id, charge) = idWithCharge
+        val cloud = this[id]!!
+        if (cloud.isAlive) {
+            cloud.energy += charge * count
+            if (charge > 1) cloud.connections.forEach { n ->
+                if (this[n]!!.isAlive) newReceivers.increment((n to charge - 1), count)
             }
         }
     }
+    if (limit != null) this.forEach { (i, cloud) ->
+        if (cloud.energy >= limit) {
+            cloud.isAlive = false
+            cloud.energy = 0
+            cloud.connections.forEach { n ->
+                if (this[n]!!.isAlive) newReceivers.increment((n to 10), 1)
+            }
+        }
+    }
+    return newReceivers
 }
 
-private fun parse(data: String): Map<Int, Cloud> = data.lines()
+private fun parse(data: String): Map<String, Cloud> = data.lines()
     .associate { line ->
         val (a, b, c) = line.split(" ")
-        val id = a.substringAfter('=').substringBefore(',').toInt()
+        val id = a.substringAfter('=').substringBefore(',')
         val energy = b.substringAfter('=').substringBefore(',').toLong()
-        val connections = c.substringAfter('=').split(",").map { it.toInt() }
+        val connections = c.substringAfter('=').split(",")
         id to Cloud(energy, connections)
     }
