@@ -55,17 +55,13 @@ fun part2(data: String) = findBeach(findLand(data.lines())).size
 
 fun part3(data: String): Any {
     val map = data.lines()
-//    draw(map)
     val land = findLand(map)
-//    draw(map, land)
     val beach = findBeach(land)
-//    draw(map, land, beach)
     val trees = findForest(land - beach).toMutableSet()
-//    draw(map, land, beach, trees)
     repeat(2) {
         trees += growForest(trees, beach)
-//        draw(map, land, beach)
     }
+    draw(map, land, beach, trees)
     return trees.size
 }
 

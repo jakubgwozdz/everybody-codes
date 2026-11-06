@@ -14,6 +14,9 @@ fun List<CharSequence>.findAll(op: (Char) -> Boolean): Set<Pos> = flatMapIndexed
 }.toSet()
 
 operator fun List<String>.get(pos: Pos): Char? = getOrNull(pos.row)?.getOrNull(pos.col)
+operator fun <T> List<List<T>>.get(pos: Pos): T? = getOrNull(pos.row)?.getOrNull(pos.col)
+operator fun <T> List<MutableList<T>>.set(pos: Pos, o: T): T? = getOrNull(pos.row)
+    ?.takeIf { pos.col in it.indices }?.set(pos.col, o)
 
 fun Pos.n(dist: Int = 1): Pos = Pos(row - dist, col)
 fun Pos.ne(): Pos = Pos(row - 1, col + 1)
