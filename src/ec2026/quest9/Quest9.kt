@@ -16,7 +16,7 @@ fun main() {
     go("part1", 221) { part1(provideInput(year, quest, 1)) }
     go("part2 ex", 42) { part2(exampleA) }
     go("part2", 15507) { part2(provideInput(year, quest, 2)) }
-    go("part3", 861560957592475) { part3(provideInput(year, quest, 3)) }
+    go("part3", 861560957592476) { part3(provideInput(year, quest, 3)) }
 }
 
 fun part1(data: String) = parseAndCalculate(data) { growth, limit ->
@@ -33,24 +33,16 @@ private fun parseAndCalculate(data: String, op: (Long, Long) -> Long): Long = da
     it.split(",").map { it.substringAfter("=").toLong() }
 }.sumOf { (_, growth, limit) -> op(growth, limit) }
 
+data class Counter(var length: Long, var count: Long)
+
 fun part2(data: String) = parseAndCalculate(data) { growth, limit ->
     var elapsed = 0L
-    val branches = mutableListOf(0L)
-    val counts = mutableListOf(1L)
-    print("$growth, $limit => ")
-    while (counts.sum() / 2 + 1 < limit) {
-        val time = growth - branches.first()
-        check(time > 0L)
-        elapsed += time
-        (branches to counts).growFor(time)
-        check(branches.zipWithNext().all { (a, b) -> a > b }) {
-            "mismatch order in ${
-                branches.zip(counts).joinToString(", ") { (b, c) -> "${c}x$b" }
-            }"
-        }
+    val bc = mutableListOf(Counter(0, 1))
+    while (bc.sumOf { it.count } / 2 + 1 < limit) {
+        elapsed += bc.growUntil(growth)
+        check(bc.zipWithNext().all { (a, b) -> a.length > b.length }) { "mismatch order in $bc" }
     }
-    println("$elapsed")
-    elapsed
+    elapsed.coerceAtLeast(1)
 }
 
 private fun MutableList<Long>.grow(growth: Long) = indices.forEach { i ->
@@ -63,24 +55,22 @@ private fun MutableList<Long>.grow(growth: Long) = indices.forEach { i ->
     }
 }
 
-private fun Pair<MutableList<Long>, MutableList<Long>>.growFor(time: Long) {
-    val (branches, counts) = this
-    branches.indices.forEach { i -> branches[i] += time }
-    val growth = branches.removeAt(0)
-    val c = counts.removeAt(0)
-    branches.add(1)
-    counts.add(c)
-    val index = branches.binarySearchDesc(growth / 2)
+private fun MutableList<Counter>.growUntil(growth: Long): Long {
+    val (len0, cnt0) = removeFirst()
+    val delta = growth - len0
+    forEach { it.length += delta }
+    add(Counter(1, cnt0))
+    val index = binarySearchDesc(growth / 2)
     if (index >= 0) {
-        check(branches[index] == growth / 2)
-        counts[index] += c * 2
+        check(this[index].length == growth / 2)
+        this[index].count += cnt0 * 2
     } else {
-        branches.add(-index - 1, growth / 2)
-        counts.add(-index - 1, c * 2)
+        add(-index - 1, Counter(growth / 2, cnt0 * 2))
     }
+    return delta
 }
 
-private fun List<Long>.binarySearchDesc(element: Long): Int {
+private fun List<Counter>.binarySearchDesc(element: Long): Int {
 
     var low = 0
     var high = size - 1
@@ -88,7 +78,7 @@ private fun List<Long>.binarySearchDesc(element: Long): Int {
     while (low <= high) {
         val mid = (low + high).ushr(1) // safe from overflows
         val midVal = get(mid)
-        val cmp = -compareValues(midVal, element)
+        val cmp = -compareValues(midVal.length, element)
 
         if (cmp < 0)
             low = mid + 1
