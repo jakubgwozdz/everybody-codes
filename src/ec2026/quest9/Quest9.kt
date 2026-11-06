@@ -19,55 +19,48 @@ fun main() {
     go("part3", 861560957592476) { part3(provideInput(year, quest, 3)) }
 }
 
-fun part1(data: String) = parseAndCalculate(data) { growth, limit ->
-    var elapsed = 0L
-    val branches = mutableListOf(0L)
-    while (branches.sum() + branches.count() / 2 < limit) {
-        elapsed++
-        branches.grow(growth)
-    }
-    elapsed
-}
+fun part1(data: String) = parseAndCalculate(
+    data,
+    growWhile = { _, limit -> sumOf { it.count } / 2 + sumOf { it.count * it.length } < limit },
+    growBy = { _, _ -> 1L }
+)
 
-private fun parseAndCalculate(data: String, op: (Long, Long) -> Long): Long = data.lines().map {
+fun part2(data: String) = parseAndCalculate(
+    data,
+    growWhile = { _, limit -> sumOf { it.count } / 2 + 1 < limit },
+    growBy = { growth, _ -> growth - this[0].length }
+)
+
+private fun parseAndCalculate(
+    data: String,
+    growWhile: List<Counter>.(Long, Long) -> Boolean,
+    growBy: List<Counter>.(Long, Long) -> Long
+): Long = data.lines().map {
     it.split(",").map { it.substringAfter("=").toLong() }
-}.sumOf { (_, growth, limit) -> op(growth, limit) }
-
-data class Counter(var length: Long, var count: Long)
-
-fun part2(data: String) = parseAndCalculate(data) { growth, limit ->
+}.sumOf { (_, growth, limit) ->
     var elapsed = 0L
     val bc = mutableListOf(Counter(0, 1))
-    while (bc.sumOf { it.count } / 2 + 1 < limit) {
-        elapsed += bc.growUntil(growth)
-        check(bc.zipWithNext().all { (a, b) -> a.length > b.length }) { "mismatch order in $bc" }
+    while (bc.growWhile(growth, limit)) {
+        val delta = bc.growBy(growth, limit)
+        bc.forEach { it.length += delta }
+        if (bc[0].length == growth) bc.splitFirst()
+        elapsed += delta
     }
     elapsed.coerceAtLeast(1)
 }
 
-private fun MutableList<Long>.grow(growth: Long) = indices.forEach { i ->
-    this[i]++
-    if (this[i] == growth) {
-        val t = this[i]
-        this[i] = t / 2
-        add(t / 2)
-        add(1)
-    }
-}
+data class Counter(var length: Long, var count: Long)
 
-private fun MutableList<Counter>.growUntil(growth: Long): Long {
+private fun MutableList<Counter>.splitFirst() {
     val (len0, cnt0) = removeFirst()
-    val delta = growth - len0
-    forEach { it.length += delta }
     add(Counter(1, cnt0))
-    val index = binarySearchDesc(growth / 2)
+    val index = binarySearchDesc(len0 / 2)
     if (index >= 0) {
-        check(this[index].length == growth / 2)
+        check(this[index].length == len0 / 2)
         this[index].count += cnt0 * 2
     } else {
-        add(-index - 1, Counter(growth / 2, cnt0 * 2))
+        add(-index - 1, Counter(len0 / 2, cnt0 * 2))
     }
-    return delta
 }
 
 private fun List<Counter>.binarySearchDesc(element: Long): Int {
@@ -91,4 +84,3 @@ private fun List<Counter>.binarySearchDesc(element: Long): Int {
 }
 
 fun part3(data: String) = part2(data)
-// 861560957592475 correct/correct -> incorrect
