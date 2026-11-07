@@ -1,5 +1,6 @@
 package ec2026.quest10
 
+import collections.increment
 import coords.Direction
 import coords.findAll
 import coords.get
@@ -31,25 +32,30 @@ fun main() {
     go("part2 ex", 50000) { part2(exampleA) }
     go("part2") { part2(provideInput(year, quest, 2)) }
 //    go("part3 ex", exampleA) { part3(exampleA) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 14449275358775) { part3(provideInput(year, quest, 3)) }
 }
-
-data class NullGhost(
-    val id: Int,
-    var pos: Pos,
-    var dir: Direction,
-    var collisions: Long = 0,
-    var isAlive: Boolean = true
-)
 
 fun part1(data: String): Any {
-    val (walls, nullGhosts) = parse(data)
-    repeat(10) {
-        movePhase(nullGhosts, walls)
-        ghostCollisionsCheck(nullGhosts)
-    }
-    return nullGhosts.sumOf { it.collisions }
+    val (walls, snapshot) = parse(data)
+    return generateSequence(snapshot) {
+        it.movePhase(walls)
+            .ghostCollisionsCheck()
+            .nextRound()
+    }.dropWhile { it.round < 10 }.first().ghosts.values.sum()
 }
+
+fun part2(data: String, limit: Long = 10000): Any {
+    val (walls, snapshot) = parse(data)
+    val snapshots = mutableMapOf<Set<Snapshot.Key>, Snapshot>()
+    return generateSequence(snapshot) {
+        it.movePhase(walls).removeOverLimit(limit)
+            .ghostCollisionsCheck().removeOverLimit(limit)
+            .detectAndSkipLoops(snapshots, limit)
+            .nextRound()
+    }.dropWhile { it.ghosts.isNotEmpty() }.first().round
+}
+
+fun part3(data: String) = part2(data, 1000000000000)
 
 data class Snapshot(
     val round: Long,
@@ -60,72 +66,52 @@ data class Snapshot(
     operator fun get(key: Key): Long = ghosts.getValue(key)
 }
 
-private fun makeSnapshot(round: Long, nullGhosts: List<NullGhost>): Snapshot {
-    val ghosts = nullGhosts.filter { it.isAlive }.associate { Snapshot.Key(it.id, it.pos, it.dir) to it.collisions }
-    return Snapshot(round, ghosts)
-}
-
-fun part2(data: String, limit: Long = 10000): Any {
-    val (walls, nullGhosts) = parse(data)
-    var round = 0L
-    val snapshots = mutableMapOf<Set<Snapshot.Key>, Snapshot>()
-    while (nullGhosts.any { it.isAlive }) {
-        round += detectAndSkipLoops(round, nullGhosts, snapshots, limit)
-        round++
-        movePhase(nullGhosts, walls)
-        nullGhosts.forEach { if (it.collisions >= limit) it.isAlive = false }
-        ghostCollisionsCheck(nullGhosts)
-        nullGhosts.forEach { if (it.collisions >= limit) it.isAlive = false }
-    }
-    return round
-}
-
-// returns skipped rounds
-private fun detectAndSkipLoops(
-    round: Long,
-    nullGhosts: List<NullGhost>,
+fun Snapshot.detectAndSkipLoops(
     snapshots: MutableMap<Set<Snapshot.Key>, Snapshot>,
     limit: Long
-): Long {
-    val snapshot = makeSnapshot(round, nullGhosts)
-    val keys = snapshot.ghosts.keys
+): Snapshot {
+    val keys = ghosts.keys
     val previousSnapshot = snapshots[keys]
     if (previousSnapshot != null) {
-        snapshots.clear()
-
-        val deltas = keys.associate { it.id to snapshot[it] - previousSnapshot[it] }
-        val remainingCycles = keys.minOf { (limit - snapshot[it] - 1) / deltas.getValue(it.id) }
-
-        nullGhosts.filter { it.isAlive }.forEach { it.collisions += remainingCycles * deltas.getValue(it.id) }
-        return remainingCycles * (snapshot.round - previousSnapshot.round)
-    } else {
-        snapshots[keys] = snapshot
-        return 0
-    }
-}
-
-fun part3(data: String) = part2(data, 1000000000000)
-
-private fun movePhase(nullGhosts: List<NullGhost>, walls: Set<Pos>) {
-    nullGhosts.filter { it.isAlive }.forEach {
-        val next = it.pos.move(it.dir)
-        if (next in walls) {
-            it.collisions++
-            it.dir = it.dir.turnRight()
-        } else it.pos = next
-    }
-}
-
-private fun ghostCollisionsCheck(nullGhosts: List<NullGhost>) {
-    nullGhosts.filter { it.isAlive }.groupBy { it.pos }.values.filter { it.size > 1 }.forEach { list ->
-        list.forEach {
-            it.collisions++
-            it.dir = it.dir.turnLeft().turnLeft()
+        val deltas = keys.associate { it.id to this[it] - previousSnapshot[it] }
+        val remainingCycles = keys.minOf { (limit - this[it] - 1) / deltas.getValue(it.id).coerceAtLeast(1) }
+        return copy(
+            round = round + remainingCycles * (round - previousSnapshot.round),
+            ghosts = ghosts.mapValues { (key, collisions) -> collisions + remainingCycles * deltas.getValue(key.id) }
+        ).also {
+            snapshots.clear()
         }
+    } else {
+        snapshots[keys] = this
+        return this
     }
 }
 
-private fun parse(data: String): Pair<Set<Pos>, List<NullGhost>> {
+fun Snapshot.removeOverLimit(limit: Long) = copy(ghosts = ghosts.filterValues { it < limit })
+
+fun Snapshot.nextRound() = copy(round = round + 1)
+
+fun Snapshot.movePhase(walls: Set<Pos>) = copy(ghosts = ghosts.asIterable().associate { (key, collisions) ->
+    val next = key.pos.move(key.dir)
+    if (next in walls) {
+        key.copy(dir = key.dir.turnRight()) to collisions + 1
+    } else {
+        key.copy(pos = next) to collisions
+    }
+})
+
+fun Snapshot.ghostCollisionsCheck(): Snapshot {
+    val collisions = mutableMapOf<Int, Long>()
+    ghosts.keys.groupBy { it.pos }.values.filter { it.size > 1 }.flatten().forEach { collisions.increment(it.id) }
+    val newCounters = ghosts.entries.associate { (key, value) ->
+        val colls = collisions[key.id] ?: 0
+        val newKey = if (colls % 2 == 0L) key else key.copy(dir = key.dir.turnRight().turnRight())
+        newKey to value + colls
+    }
+    return copy(ghosts = newCounters)
+}
+
+private fun parse(data: String): Pair<Set<Pos>, Snapshot> {
     val lines = data.split("\n")
     val walls = lines.findAll('#')
     val nullGhosts = lines.findAll { it in "<>^v" }.mapIndexed { index, pos ->
@@ -136,8 +122,9 @@ private fun parse(data: String): Pair<Set<Pos>, List<NullGhost>> {
             'v' -> Direction.S
             else -> error("WTF")
         }
-        NullGhost(index + 1, pos, dir)
+        Snapshot.Key(index + 1, pos, dir)
     }
-    return Pair(walls, nullGhosts)
+    val snapshot = Snapshot(0, nullGhosts.associateWith { 0 })
+    return Pair(walls, snapshot)
 }
 
