@@ -50,7 +50,6 @@ fun part1(data: String): Any {
 
     val edges = buildMap {
         repeat(portals) { p ->
-            put(p to p, 0)
             put(p to (p + 1).mod(portals), 1)
             put((p + 1).mod(portals) to p, 1)
         }
@@ -65,7 +64,7 @@ fun part1(data: String): Any {
         }
     }
 
-    val r2 = calculateFloydWarshall(portals, edges + extraConnections).sumOf { it.sum() }
+    val r2 = calculateFloydWarshall(portals, edges + extraConnections).sum()
     return r1 - r2
 }
 
@@ -74,7 +73,6 @@ fun part2(data: String): Any {
 
     val edges = buildMap {
         repeat(portals) { p ->
-            put(p to p, 0)
             repeat(3) {
                 put(p to (p + 1 + it).mod(portals), 1)
                 put((p + 1 + it).mod(portals) to p, 1)
@@ -82,7 +80,7 @@ fun part2(data: String): Any {
         }
     }
 
-    val r1 = calculateFloydWarshall(portals, edges).sumOf { it.sum() }
+    val r1 = calculateFloydWarshall(portals, edges).sum()
 
     // shortcuts
     val extraConnections = buildMap {
@@ -98,7 +96,7 @@ fun part2(data: String): Any {
                 put(s to d, 1)
                 put(d to s, 1)
             }
-            calculateFloydWarshall(portals, edges + extraConnections + lastConnection).sumOf { it.sum() }
+            calculateFloydWarshall(portals, edges + extraConnections + lastConnection).sum()
         } ?: Int.MAX_VALUE
     }
 
@@ -110,7 +108,6 @@ fun part3(data: String): Any {
 
     val edges = buildMap {
         repeat(portals) { p ->
-            put(p to p, 0)
             repeat(3) {
                 put(p to (p + 1 + it).mod(portals), 1)
                 put((p + 1 + it).mod(portals) to p, 1)
@@ -118,7 +115,7 @@ fun part3(data: String): Any {
         }
     }
 
-    val r1 = calculateFloydWarshall(portals, edges).sumOf { it.sum() }
+    val r1 = calculateFloydWarshall(portals, edges).sum()
 //    println(state)
 
     // shortcuts
@@ -131,17 +128,18 @@ fun part3(data: String): Any {
 
     val r2 = (0..<portals / 8).minOf { o ->
 
-        permutations(8).minOf { list ->
-            val lastConnections = buildMap {
-                list.chunked(2).forEach { (s0, d0) ->
-                    val s = o + (portals / 8) * s0
-                    val d = (o + (portals / 8) * d0) % portals
-                    put(s to d, 1)
-                    put(d to s, 1)
+        permutations(8).filter { it.chunked(2).all { (a, b) -> a < b } }
+            .minOf { list ->
+                val lastConnections = buildMap {
+                    list.chunked(2).forEach { (s0, d0) ->
+                        val s = o + (portals / 8) * s0
+                        val d = (o + (portals / 8) * d0) % portals
+                        put(s to d, 1)
+                        put(d to s, 1)
+                    }
                 }
+                calculateFloydWarshall(portals, edges + extraConnections + lastConnections).sum()
             }
-            calculateFloydWarshall(portals, edges + extraConnections + lastConnections).sumOf { it.sum() }
-        }
 
     }
     return r1 - r2
@@ -194,3 +192,5 @@ fun calculateFloydWarshall(
     }
     return current
 }
+
+fun Array<IntArray>.sum() = 2 * indices.sumOf { i -> (i + 1..this[i].lastIndex).fold(0) { acc, j -> acc + this[i][j] } }
