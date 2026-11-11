@@ -11,102 +11,34 @@ val exampleA = """
     2 7
 """.trimIndent()
 
+val exampleB = """
+    portals: 32
+
+    1 10
+    20 30
+    15 29
+    13 10
+""".trimIndent()
+
+val exampleC = """
+    portals: 64
+
+    1 40
+    3 35
+    5 42
+    7 50
+""".trimIndent()
+
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1 ex", 60) { part1(exampleA) }
     go("part1") { part1(provideInput(year, quest, 1)) }
     go("part2 ex", 6) { part2(exampleA) }
     go("part2") { part2(provideInput(year, quest, 2)) }
-//    go("part3 ex", exampleA) { part3(exampleA) }
-//    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3 ex", 854) { part3(exampleB) }
+    go("part3 ex", 9634) { part3(exampleC) }
+    go("part3", 27952) { part3(provideInput(year, quest, 3)) }
 }
-
-fun self(portals: Int) = (0..<portals).associate { (it to it) to 0 }
-fun ring(portals: Int) = (0..<portals).associate { (it to (it + 1) % portals) to 1 } +
-        (0..<portals).associate { ((it + 1) % portals to it) to 1 }
-
-data class State(
-    val portals: Int,
-    val edges: Map<Pair<Int, Int>, Int>,
-) {
-
-    fun reset() {
-//        cache.clear()
-//        cache.putAll(initialCache(portals))
-    }
-
-    fun add(src: Int, dst: Int, distance: Int = 1) {
-//        cache[key(src, dst)] = distance
-//        cache[key(dst, src)] = distance
-    }
-
-    private fun key(src: Int, dst: Int): Pair<Int, Int> {
-        val s = src.mod(portals)
-        val d = dst.mod(portals)
-        return s to d
-//        return if (s <= d) s to d else d to s
-    }
-
-//    fun calcDistance(src: Int, dst: Int): Int = calcDistance(key(src, dst))
-//    fun calcDistance(key: Pair<Int, Int>): Int {
-//        val existing = cache[key]
-//        if (existing != null) return existing
-//        val (src, dst) = key
-//        listOf(src - 1 to dst, src to dst - 1, src + 1 to dst, src to dst + 1)
-//            .map { (s, d) -> key(s, d) }
-//            .forEach { nextK ->
-//                cache[key] = (cache[key] ?: portals).coerceAtMost(calcDistance(nextK) + 1)
-//            }
-//        return cache[key]!!
-//    }
-//
-//    fun calcRow(src: Int) = (0..<portals).sumOf { calcDistance(src, it) }
-
-    private val cache = Array(portals) { Array(portals) { null as Int? } }
-
-    fun calc(): Int {
-        val even = Array(portals) { IntArray(portals) { portals } }
-        val odd = Array(portals) { IntArray(portals) { portals } }
-
-        var current = even
-        var prev = odd
-        fun swap() {
-            val tmp = prev
-            prev = current
-            current = tmp
-        }
-//        fun current() = if (currentEven) even else odd
-//        fun prev() = if (currentEven) odd else even
-
-        edges.forEach { (p, d) -> current[p.first][p.second] = d }
-
-        repeat(portals) { k ->
-            swap()
-            repeat(portals) { i ->
-                repeat(portals) { j ->
-                    current[i][j] = prev[i][j].coerceAtMost(prev[i][k] + prev[k][j])
-                }
-            }
-        }
-        repeat(portals) { i ->
-            repeat(portals) { j ->
-                cache[i][j] = current[i][j]
-            }
-        }
-
-        return (0..<portals).sumOf { current[it].sum() }
-    }
-
-    override fun toString(): String = (0..<portals).joinToString("\n") { src ->
-        (0..<portals).joinToString("") { dst -> cache[src][dst]?.let { "%3d".format(it) } ?: "   " }
-    }
-
-//    fun clone(): State {
-//        return copy(cache = cache.toMutableMap())
-//    }
-}
-
-private fun initialCache(portals: Int) = (0..<portals).associate { (it to it) to 0 }
 
 fun parse(data: String) = data.lines().first().substringAfter("portals: ").toInt() to
         data.lines().drop(2).map { it.split(" ") }
@@ -124,9 +56,7 @@ fun part1(data: String): Any {
         }
     }
 
-    val state = State(portals, edges)
-
-    val r1 = state.portals * (state.portals / 2).let { it * it }
+    val r1 = portals * (portals / 2).let { it * it }
 
     val extraConnections = buildMap {
         shortcuts.forEach { (s, d) ->
@@ -135,7 +65,7 @@ fun part1(data: String): Any {
         }
     }
 
-    val r2 = State(portals, edges + extraConnections).calc()
+    val r2 = calculateFloydWarshall(portals, edges + extraConnections).sumOf { it.sum() }
     return r1 - r2
 }
 
@@ -152,9 +82,43 @@ fun part2(data: String): Any {
         }
     }
 
-    val state = State(portals, edges)
+    val r1 = calculateFloydWarshall(portals, edges).sumOf { it.sum() }
 
-    val r1 = state.calc()
+    // shortcuts
+    val extraConnections = buildMap {
+        shortcuts.forEach { (s, d) ->
+            put(s to d, 1)
+            put(d to s, 1)
+        }
+    }
+
+    val r2 = (0..<portals).minOf { s ->
+        (s + 4..<portals).minOfOrNull { d ->
+            val lastConnection = buildMap {
+                put(s to d, 1)
+                put(d to s, 1)
+            }
+            calculateFloydWarshall(portals, edges + extraConnections + lastConnection).sumOf { it.sum() }
+        } ?: Int.MAX_VALUE
+    }
+
+    return r1 - r2
+}
+
+fun part3(data: String): Any {
+    val (portals, shortcuts) = parse(data)
+
+    val edges = buildMap {
+        repeat(portals) { p ->
+            put(p to p, 0)
+            repeat(3) {
+                put(p to (p + 1 + it).mod(portals), 1)
+                put((p + 1 + it).mod(portals) to p, 1)
+            }
+        }
+    }
+
+    val r1 = calculateFloydWarshall(portals, edges).sumOf { it.sum() }
 //    println(state)
 
     // shortcuts
@@ -165,19 +129,68 @@ fun part2(data: String): Any {
         }
     }
 
-    val r2 = (0..<portals).minOf { s->
-        (s+4..<portals).minOfOrNull { d->
-            val lastConnection = buildMap {
-                put(s to d, 1)
-                put(d to s, 1)
-            }
-            State(portals, edges + extraConnections + lastConnection).calc()
-        }?:Int.MAX_VALUE
-    }
+    val r2 = (0..<portals / 8).minOf { o ->
 
+        permutations(8).minOf { list ->
+            val lastConnections = buildMap {
+                list.chunked(2).forEach { (s0, d0) ->
+                    val s = o + (portals / 8) * s0
+                    val d = (o + (portals / 8) * d0) % portals
+                    put(s to d, 1)
+                    put(d to s, 1)
+                }
+            }
+            calculateFloydWarshall(portals, edges + extraConnections + lastConnections).sumOf { it.sum() }
+        }
+
+    }
     return r1 - r2
 }
 
-fun part3(data: String): Any {
-    return data
+fun permutations(n: Int): Sequence<List<Int>> {
+    val a = IntArray(n) { it }
+    return sequenceOf(a.toList()) + generateSequence {
+        var i = a.size - 1
+        while (i > 0 && a[i] <= a[i - 1]) i--
+        if (i <= 0) return@generateSequence null
+        var j = a.size - 1
+        while (a[j] <= a[i - 1]) j--
+        a.swap(i - 1, j)
+        j = a.size - 1
+        while (i < j) a.swap(i++, j--)
+        a.toList()
+    }
+}
+
+fun IntArray.swap(i: Int, j: Int) {
+    val v = this[i]
+    this[i] = this[j]
+    this[j] = v
+}
+
+fun calculateFloydWarshall(
+    size: Int, edges: Map<Pair<Int, Int>, Int>
+): Array<IntArray> {
+    val even = Array(size) { IntArray(size) { size } }
+    val odd = Array(size) { IntArray(size) { size } }
+
+    var current = even
+    var prev = odd
+    fun swap() {
+        val tmp = prev
+        prev = current
+        current = tmp
+    }
+
+    edges.forEach { (p, d) -> current[p.first][p.second] = d }
+
+    repeat(size) { k ->
+        swap()
+        repeat(size) { i ->
+            repeat(size) { j ->
+                current[i][j] = prev[i][j].coerceAtMost(prev[i][k] + prev[k][j])
+            }
+        }
+    }
+    return current
 }
