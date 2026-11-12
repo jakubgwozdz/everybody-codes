@@ -36,14 +36,29 @@ val exampleB = """
     ...............................
 """.trimIndent()
 
+val exampleC = """
+    ..............................
+    .##########....##.....#######.
+    .##########.##.##..#..#######.
+    .####..####.##.##.....#.#####.
+    .##########.##.#####..#.#####.
+    .##########.##........#######.
+    ..............................
+    .##########..################.
+    .##########..#..............#.
+    .#######..#..#..............#.
+    .#######..#..################.
+    .##########..################.
+    ..............................
+""".trimIndent()
+
 fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1 ex", 7) { part1(exampleA) }
     go("part1") { part1(provideInput(year, quest, 1)) }
     go("part2 ex", 23) { part2(exampleB) }
-//    go("part2 ex", exampleA) { part2(exampleA) }
     go("part2", 2012) { part2(provideInput(year, quest, 2)) }
-//    go("part3 ex", exampleA) { part3(exampleA) }
+    go("part3 ex", 29) { part3(exampleC) }
     go("part3") { part3(provideInput(year, quest, 3)) }
 }
 
@@ -72,42 +87,49 @@ fun part1(data: String): Any {
 fun part2(data: String): Any {
     val figures = findFigures(data)
     return figures.sumOf { visited ->
-        val (rows, cols) = cover(visited) ?: error("WTF")
-
-        val shots = if (rows.first to cols.first in visited &&
-            rows.last to cols.first in visited &&
-            rows.first to cols.last in visited &&
-            rows.last to cols.last in visited
-        ) {
-            //rectangle
-            minOf(rows.last - rows.first, cols.last - cols.first) + 1
-        } else {
-            //L-Shape
-            lShape(cols, rows, visited)
-        }
-        shots//.also { println(it) }
+        calcFigure(visited).also { println(it) }
     }
 }
 
 fun part3(data: String): Any {
     val figures = findFigures(data)
     return figures.sumOf { visited ->
-        val (rows, cols) = cover(visited) ?: error("WTF")
-
-        val shots = if (rows.first to cols.first in visited &&
-            rows.last to cols.first in visited &&
-            rows.first to cols.last in visited &&
-            rows.last to cols.last in visited
-        ) {
-            //rectangle
-            TODO()
-        } else {
-            //L-Shape
-            lShape(cols, rows, visited)
-        }
-        shots//.also { println(it) }
+        calcFigure(visited).also { println(it) }
     }
 }
+
+private fun calcFigure(visited: Set<Pos>): Int {
+    val (rows, cols) = cover(visited) ?: error("WTF")
+
+    val shots = if (rows.first to cols.first in visited &&
+        rows.last to cols.first in visited &&
+        rows.first to cols.last in visited &&
+        rows.last to cols.last in visited
+    ) {
+        val (rows1, cols1) = cover(buildSet { rows.forEach { r -> cols.forEach { c -> if (r to c !in visited) add(r to c) } } })
+            ?: return calc(rows, cols)
+
+        val topEdge = rows.first..<rows1.first
+        val bottomEdge = rows1.last + 1..rows.last
+        val leftEdge = cols.first..<cols1.first
+        val rightEdge = cols1.last + 1..cols.last
+
+        val (toRemove, direction) =
+            listOf(topEdge to "top row", bottomEdge to "bottom row", leftEdge to "left col", rightEdge to "right col")
+                .filter { (range, _) -> !range.isEmpty() }
+                .minBy { (range, _) -> range.let { it.last - it.first } }
+
+        val f = toRemove.last - toRemove.first + 1
+        val v2 = visited.filter { (if (direction.endsWith("row")) it.row else it.col) !in toRemove }.toMutableSet()
+        f + calcFigure(v2)
+
+    } else {
+        //L-Shape
+        lShape(cols, rows, visited)
+    }
+    return shots
+}
+// 2963 correcr correct incorrect
 
 
 private fun findFigures(data: String): List<MutableSet<Pos>> {
@@ -138,7 +160,7 @@ private fun findFigures(data: String): List<MutableSet<Pos>> {
 private fun lShape(
     cols: IntRange,
     rows: IntRange,
-    visited: MutableSet<Pos>
+    visited: Set<Pos>
 ): Int {
     val l1 = cols.first { rows.first to it in visited && rows.last to it in visited }
     val r1 = cols.last { rows.first to it in visited && rows.last to it in visited }
@@ -152,9 +174,13 @@ private fun lShape(
     return minOf(commonShotHorizontal, commonShotVertical)
 }
 
+private fun calc(rows: IntRange, cols: IntRange): Int {
+    return minOf(rows.last - rows.first, cols.last - cols.first) + 1
+}
+
 private fun calc(points: Set<Pos>): Int {
     val (rows, cols) = cover(points) ?: return 0
-    return minOf(rows.last - rows.first, cols.last - cols.first) + 1
+    return calc(rows, cols)
 }
 
 fun cover(points: Set<Pos>) = if (points.isEmpty()) null else {
