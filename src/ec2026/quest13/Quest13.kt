@@ -34,8 +34,7 @@ fun main() {
     go("part1", 30) { part1(provideInput(year, quest, 1)) }
     go("part2 ex", 21) { part2(exampleB) }
     go("part2", 131400) { part2(provideInput(year, quest, 2)) }
-//    go("part3 ex", exampleA) { part3(exampleA) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 1266059882463) { part3(provideInput(year, quest, 3)) }
 }
 
 data class Hand(
@@ -50,7 +49,7 @@ private fun calcClock(clock: List<Hand>): Long {
     var result = 0L
     (0..<clock.lastIndex).forEach { i ->
         (i + 1..clock.lastIndex).forEach { j ->
-            result += calc(clock[i], clock[j])
+            result += calcTwoHands(clock[i], clock[j])
         }
     }
     return result
@@ -62,43 +61,43 @@ private fun Hand.normalize(newCount: Long) = copy(
     speed = speed * newCount / count,
 )
 
-// 29 incorrect
-private fun calc(h1: Hand, h2: Hand): Long {
-//    println("$h1 vs $h2 => ")
-//    val total = h1.count * h2.count
-//    println("  normalized $n1 vs $n2")
-//    val meetings = analytical(h1, h2)
-
-    val stepByStep = stepByStep(h1, h2)
-
-//    println("  meetings $meetings")
-//    println("  step by step $stepByStep")
-//    check(stepByStep == meetings)
-    return stepByStep
-//    return meetings
-}
-
-private fun stepByStep(h1: Hand, h2: Hand): Long {
+private fun calcTwoHands(h1: Hand, h2: Hand): Long {
     if (h1.count != h2.count) {
-        val total = h1.count * h2.count
-        return stepByStep(h1.normalize(total), h2.normalize(total))
+        return calcTwoHands(h1.normalize(h1.count * h2.count), h2.normalize(h1.count * h2.count))
+    }
+    if (h1.moves > h2.moves) {
+        return calcTwoHands(h2, h1)
     }
 
-    var stepByStep = 0L
+    val cycle = h1.count
     var p1 = h1.pos
     var p2 = h2.pos
-    repeat(maxOf(h1.moves, h2.moves).toInt()) { move ->
-        val ep1 = if (move >= h1.moves) p1 else (p1 + h1.speed)
-        val ep2 = if (move >= h2.moves) p2 else (p2 + h2.speed)
-//        println("  $p1 => $ep1; $p2 => $ep2; signals: $stepByStep")
-        if (met(p1, p2, ep1, ep2, h1.count)) {
-            stepByStep++
-//            println("  PING")
-        }
-        p1 = ep1.mod(h1.count)
-        p2 = ep2.mod(h1.count)
+    var signals = 0L
+
+    fun step(speed1: Long, speed2: Long) {
+        val ep1 = p1 + speed1
+        val ep2 = p2 + speed2
+        if (met(p1, p2, ep1, ep2, cycle)) signals++
+        p1 = ep1.mod(cycle)
+        p2 = ep2.mod(cycle)
     }
-    return stepByStep
+
+    val phase1moves = h1.moves
+    val phase2moves = h2.moves - h1.moves
+
+    if (phase1moves >= cycle) repeat(cycle.toInt()) { step(h1.speed, h2.speed) }
+    signals *= phase1moves / cycle
+    repeat(h1.moves.mod(cycle).toInt()) { step(h1.speed, h2.speed) }
+    val phase1signals = signals
+
+    signals = 0
+
+    if (phase2moves >= cycle) repeat(cycle.toInt()) { step(0, h2.speed) }
+    signals *= phase2moves / cycle
+    repeat(phase2moves.mod(cycle).toInt()) { step(0, h2.speed) }
+    val phase2signals = signals
+
+    return phase1signals + phase2signals
 }
 
 private fun met(
