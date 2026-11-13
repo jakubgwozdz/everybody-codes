@@ -41,12 +41,14 @@ fun main() {
     go("part2", 433) { part2(provideInput(year, quest, 2)) }
     go("part3 ex", 0) { part3(exampleA) }
     go("part3 ex", 21) { part3(exampleB) }
-    go("part3") { part3(provideInput(year, quest, 3)) }
+    go("part3", 1728) { part3(provideInput(year, quest, 3)) }
 }
 
 const val FRAME_CHAR = ' '
 
-fun parse(data: String): Map<Char, Map<Char, Int>> {
+typealias Edge = Triple<Char, Char, Int>
+
+fun parse(data: String): List<Edge> {
     val map = data.lines()
     val counters = mutableMapOf<Char, MutableMap<Char, Int>>()
 
@@ -70,26 +72,23 @@ fun parse(data: String): Map<Char, Map<Char, Int>> {
         }
     }
 
-    return counters.mapValues { it.value.toMap() }
-}
-
-fun part1(data: String) = parse(data).entries.sumOf { (ch1, counts) ->
-    counts.entries.sumOf { (ch2, count) ->
-        if (ch1 < ch2) count else 0
+    return counters.entries.flatMap { (ch1, counts) ->
+        counts.entries.mapNotNull { (ch2, count) ->
+            if (ch2 <= ch1) null
+            else Edge(ch1, ch2, count)
+        }
     }
 }
 
+fun part1(data: String) = parse(data).sumOf { it.third }
+
 fun part2(data: String) = minimalSpanningTree(parse(data))
 
-typealias Edge = Triple<Char, Char, Int>
-
-private fun minimalSpanningTree(edges: Map<Char, Map<Char, Int>>): Int {
+private fun minimalSpanningTree(edges: Collection<Edge>): Int {
     var result = 0
     val disjointSets = mutableListOf<Set<Char>>()
 
-    val sortedEdges = edges.flatMap { (ch1, counts) ->
-        counts.mapNotNull { (ch2, count) -> if (ch1 < ch2) Edge(ch1, ch2, count) else null }
-    }.sortedBy { it.third }
+    val sortedEdges = edges.sortedBy { it.third }
 
     sortedEdges.forEach { (ch1, ch2, len) ->
         result += len
@@ -117,18 +116,25 @@ private fun minimalSpanningTree(edges: Map<Char, Map<Char, Int>>): Int {
 }
 
 fun part3(data: String): Any {
-    val counters = parse(data)
-    return counters.keys.flatMap { ch1 ->
-        if (ch1 == FRAME_CHAR) emptyList()
-        else counters.keys.mapNotNull { ch2 ->
-            if (ch2 == FRAME_CHAR) null
-            else if (ch2 < ch1) null
-            else ch1 to ch2
+    val edges = parse(data)
+    val vertices = buildSet {
+        edges.forEach { (v1, v2, _) ->
+            if (v1 != FRAME_CHAR) add(v1)
+            if (v2 != FRAME_CHAR) add(v2)
         }
+    }.sorted()
+    return vertices.flatMapIndexed { i1, v1 ->
+        (i1 + 1..vertices.lastIndex).map { i2 -> v1 to vertices[i2] }
     }.minOf { (ch1, ch2) ->
-        val counters1 = counters.mapValues { (chA, counts) ->
-            counts.mapValues { (chB, count) -> if (chA == ch1 || chB == ch1 || chA == ch2 || chB == ch2) 0 else count }
+        val edges1 = edges.map {
+            when {
+                it.first == ch1 -> it.copy(third = 0)
+                it.first == ch2 -> it.copy(third = 0)
+                it.second == ch1 -> it.copy(third = 0)
+                it.second == ch2 -> it.copy(third = 0)
+                else -> it
+            }
         }
-        minimalSpanningTree(counters1)
+        minimalSpanningTree(edges1)
     }
 }
