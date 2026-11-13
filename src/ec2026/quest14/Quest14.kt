@@ -84,19 +84,22 @@ fun part1(data: String) = parse(data).sumOf { it.third }
 
 fun part2(data: String) = minimalSpanningTree(parse(data))
 
-private fun minimalSpanningTree(edges: Collection<Edge>): Int {
+private fun minimalSpanningTree(edges: Collection<Edge>, vararg freeVertices: Char): Int {
     var result = 0
     val disjointSets = mutableListOf<Set<Char>>()
 
-    val sortedEdges = edges.sortedBy { it.third }
+    val sortedEdges = edges.sortedBy { (ch1, ch2, w) ->
+        if (ch1 in freeVertices || ch2 in freeVertices) 0 else w
+    }
 
-    sortedEdges.forEach { (ch1, ch2, len) ->
-        result += len
+    sortedEdges.forEach { (ch1, ch2, w) ->
+        val len1 = if (ch1 in freeVertices || ch2 in freeVertices) 0 else w
+        result += len1
         val s1 = disjointSets.firstOrNull { ch1 in it }
         val s2 = disjointSets.firstOrNull { ch2 in it }
         when {
             s1 == null && s2 == null -> disjointSets += mutableSetOf(ch1, ch2)
-            s1 == s2 -> result -= len // skip, a cycle
+            s1 == s2 -> result -= len1 // skip, a cycle
             s1 == null && s2 != null -> {
                 disjointSets -= s2
                 disjointSets += s2 + ch1
@@ -123,18 +126,8 @@ fun part3(data: String): Any {
             if (v2 != FRAME_CHAR) add(v2)
         }
     }.sorted()
-    return vertices.flatMapIndexed { i1, v1 ->
+    val pairs = vertices.flatMapIndexed { i1, v1 ->
         (i1 + 1..vertices.lastIndex).map { i2 -> v1 to vertices[i2] }
-    }.minOf { (ch1, ch2) ->
-        val edges1 = edges.map {
-            when {
-                it.first == ch1 -> it.copy(third = 0)
-                it.first == ch2 -> it.copy(third = 0)
-                it.second == ch1 -> it.copy(third = 0)
-                it.second == ch2 -> it.copy(third = 0)
-                else -> it
-            }
-        }
-        minimalSpanningTree(edges1)
     }
+    return pairs.minOf { (ch1, ch2) -> minimalSpanningTree(edges, ch1, ch2) }
 }
