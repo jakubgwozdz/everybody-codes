@@ -65,55 +65,41 @@ private fun calcTwoHands(h1: Hand, h2: Hand): Long {
     if (h1.count != h2.count) {
         return calcTwoHands(h1.normalize(h1.count * h2.count), h2.normalize(h1.count * h2.count))
     }
-    if (h1.moves > h2.moves) {
+    if (h1.speed == h2.speed && h1.moves == h2.moves) {
+        return 0
+    }
+    val phase1moves = minOf(h1.moves, h2.moves)
+    if (h1.speed == h2.speed && h1.moves != 0L && h2.moves != 0L) {
+        return calcTwoHands(h1.copy(moves = h1.moves - phase1moves), h2.copy(moves = h2.moves - phase1moves))
+    }
+    if (h1.speed > h2.speed) {
         return calcTwoHands(h2, h1)
     }
-
-    val cycle = h1.count
-    var p1 = h1.pos
-    var p2 = h2.pos
-    var signals = 0L
-
-    fun step(speed1: Long, speed2: Long) {
-        val ep1 = p1 + speed1
-        val ep2 = p2 + speed2
-        if (met(p1, p2, ep1, ep2, cycle)) signals++
-        p1 = ep1.mod(cycle)
-        p2 = ep2.mod(cycle)
+    if (h1.pos != 0L) {
+        return calcTwoHands(h1.copy(pos = 0), h2.copy(pos = (h2.pos - h1.pos).mod(h2.count)))
     }
-
-    val phase1moves = h1.moves
-    val phase2moves = h2.moves - h1.moves
-
-    if (phase1moves >= cycle) repeat(cycle.toInt()) { step(h1.speed, h2.speed) }
-    signals *= phase1moves / cycle
-    repeat(h1.moves.mod(cycle).toInt()) { step(h1.speed, h2.speed) }
-    val phase1signals = signals
-
-    signals = 0
-
-    if (phase2moves >= cycle) repeat(cycle.toInt()) { step(0, h2.speed) }
-    signals *= phase2moves / cycle
-    repeat(phase2moves.mod(cycle).toInt()) { step(0, h2.speed) }
-    val phase2signals = signals
-
-    return phase1signals + phase2signals
+    if (h1.moves == 0L && h1.speed != 0L) {
+        return calcTwoHands(h1.copy(speed = 0), h2)
+    }
+    if (h2.moves == 0L && h2.speed != 0L) {
+        return calcTwoHands(h1, h2.copy(speed = 0))
+    }
+    if (h2.moves == 0L) {
+        return calcTwoHands(h1.copy(speed = -h1.speed), h2.copy(pos = (-h2.pos).mod(h2.count)))
+    }
+    if (phase1moves > 0) {
+        val h2pos = h2.pos + (h2.speed - h1.speed) * phase1moves
+        val signals = h2pos / h2.count
+        return signals + calcTwoHands(
+            h1.copy(moves = h1.moves - phase1moves),
+            h2.copy(pos = h2pos % h2.count, moves = h2.moves - phase1moves)
+        )
+    } else {
+        val phase2moves = maxOf(h1.moves, h2.moves) - phase1moves
+        val h2pos = h2.pos + h2.speed * phase2moves
+        return h2pos / h2.count
+    }
 }
-
-private fun met(
-    sp1: Long,
-    sp2: Long,
-    ep1: Long,
-    ep2: Long,
-    total: Long
-): Boolean {
-    return met0(sp1, sp2, ep1, ep2)
-            || met0(sp1 + total, sp2, ep1 + total, ep2)
-            || met0(sp1, sp2 + total, ep1, ep2 + total)
-}
-
-private fun met0(sp1: Long, sp2: Long, ep1: Long, ep2: Long): Boolean =
-    sp1 > sp2 && ep1 <= ep2 || sp1 < sp2 && ep1 >= ep2
 
 private fun parse(data: String): Sequence<List<Hand>> = data.splitToSequence("\n\n").map { clock ->
     val input = clock.lines().associate { l -> l.substringBefore(" ") to l.substringAfter(" ").split(":") }
