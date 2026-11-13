@@ -45,6 +45,10 @@ fun part1(data: String) = parse(data).sumOf { clock ->
     calcClock(clock)
 }
 
+fun part2(data: String) = part1(data)
+
+fun part3(data: String) = part2(data)
+
 private fun calcClock(clock: List<Hand>): Long {
     var result = 0L
     (0..<clock.lastIndex).forEach { i ->
@@ -55,50 +59,76 @@ private fun calcClock(clock: List<Hand>): Long {
     return result
 }
 
-private fun Hand.normalize(newCount: Long) = copy(
-    pos = pos * newCount / count,
-    count = newCount,
-    speed = speed * newCount / count,
-)
-
-private fun calcTwoHands(h1: Hand, h2: Hand): Long {
+private fun Pair<Hand, Hand>.normalizePair(): Pair<Hand, Hand> {
+    var h1 = first
+    var h2 = second
     if (h1.count != h2.count) {
-        return calcTwoHands(h1.normalize(h1.count * h2.count), h2.normalize(h1.count * h2.count))
+        val newCount = h1.count * h2.count
+        h1 = h1.copy(
+            pos = h1.pos * newCount / h1.count,
+            count = newCount,
+            speed = h1.speed * newCount / h1.count,
+        )
+        h2 = h2.copy(
+            pos = h2.pos * newCount / h2.count,
+            count = newCount,
+            speed = h2.speed * newCount / h2.count,
+        )
     }
-    if (h1.speed == h2.speed && h1.moves == h2.moves) {
-        return 0
-    }
-    val phase1moves = minOf(h1.moves, h2.moves)
     if (h1.speed == h2.speed && h1.moves != 0L && h2.moves != 0L) {
-        return calcTwoHands(h1.copy(moves = h1.moves - phase1moves), h2.copy(moves = h2.moves - phase1moves))
-    }
-    if (h1.speed > h2.speed) {
-        return calcTwoHands(h2, h1)
-    }
-    if (h1.pos != 0L) {
-        return calcTwoHands(h1.copy(pos = 0), h2.copy(pos = (h2.pos - h1.pos).mod(h2.count)))
+        val phase1moves = minOf(h1.moves, h2.moves)
+        h1 = h1.copy(moves = h1.moves - phase1moves)
+        h2 = h2.copy(moves = h2.moves - phase1moves)
     }
     if (h1.moves == 0L && h1.speed != 0L) {
-        return calcTwoHands(h1.copy(speed = 0), h2)
+        h1 = h1.copy(speed = 0)
     }
     if (h2.moves == 0L && h2.speed != 0L) {
-        return calcTwoHands(h1, h2.copy(speed = 0))
+        h2 = h2.copy(speed = 0)
     }
-    if (h2.moves == 0L) {
-        return calcTwoHands(h1.copy(speed = -h1.speed), h2.copy(pos = (-h2.pos).mod(h2.count)))
+    if (h1.speed > h2.speed) {
+        val t = h1
+        h1 = h2
+        h2 = t
     }
-    if (phase1moves > 0) {
-        val h2pos = h2.pos + (h2.speed - h1.speed) * phase1moves
-        val signals = h2pos / h2.count
-        return signals + calcTwoHands(
-            h1.copy(moves = h1.moves - phase1moves),
-            h2.copy(pos = h2pos % h2.count, moves = h2.moves - phase1moves)
-        )
-    } else {
-        val phase2moves = maxOf(h1.moves, h2.moves) - phase1moves
-        val h2pos = h2.pos + h2.speed * phase2moves
-        return h2pos / h2.count
+    if (h1.pos != 0L) {
+        h2 = h2.copy(pos = (h2.pos - h1.pos).mod(h2.count))
+        h1 = h1.copy(pos = 0)
     }
+    if (h2.moves == 0L && h1.moves != 0L) {
+        h1 = h1.copy(speed = -h1.speed)
+        h2 = h2.copy(pos = (-h2.pos).mod(h2.count))
+        val tmp = (h1 to h2).normalizePair()
+        h1 = tmp.first
+        h2 = tmp.second
+    }
+    return h1 to h2
+}
+
+private fun calcTwoHands(h1: Hand, h2: Hand): Long {
+    val (h1a, h2a) = (h1 to h2).normalizePair()
+
+    if (h1a.speed == h2a.speed && h1a.moves == h2a.moves) return 0
+    val count = h1a.count.also { check(it == h2a.count) }
+
+    // phase 1 - both hands move
+
+    val phase1moves = minOf(h1a.moves, h2a.moves)
+    val phase1speed = h2a.speed - h1a.speed // relative to hand 1
+    val phase1h2pos = h2a.pos + phase1speed * phase1moves
+    val phase1signals = phase1h2pos / count
+    val h1b = h1a.copy(moves = h1a.moves - phase1moves)
+    val h2b = h2a.copy(pos = phase1h2pos % count, moves = h2a.moves - phase1moves)
+
+    // phase 2 - only second hand moves
+
+    val (h1c, h2c) = (h1b to h2b).normalizePair()
+    check(h1c.moves == 0L)
+    val phase2speed = h2c.speed
+    val phase2h2pos = h2c.pos + phase2speed * h2c.moves
+    val phase2signals = phase2h2pos / count
+
+    return phase1signals + phase2signals
 }
 
 private fun parse(data: String): Sequence<List<Hand>> = data.splitToSequence("\n\n").map { clock ->
@@ -116,7 +146,3 @@ private fun parse(data: String): Sequence<List<Hand>> = data.splitToSequence("\n
         )
     }
 }
-
-fun part2(data: String) = part1(data)
-
-fun part3(data: String) = part2(data)
