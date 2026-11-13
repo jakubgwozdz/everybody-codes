@@ -12,9 +12,9 @@ fun main() {
     val (year, quest) = yearAndQuestFromPackage({ })
     go("part1 ex", exampleA) { part1(exampleA) }
     go("part1") { part1(provideInput(year, quest, 1)) }
-    go("part2 ex", exampleA) { part2(exampleA) }
+//    go("part2 ex", exampleA) { part2(exampleA) }
 //    go("part2") { part2(provideInput(year, quest, 2)) }
-    go("part3 ex", exampleA) { part3(exampleA) }
+//    go("part3 ex", exampleA) { part3(exampleA) }
 //    go("part3") { part3(provideInput(year, quest, 3)) }
 }
 
